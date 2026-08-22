@@ -10,75 +10,56 @@ const PosterGenerator = (function() {
   const backgrounds = {
     xuanzhi: {
       name: '宣纸',
-      image: 'assets/images/Background_RicePaper.png'
+      image: window.ZZJ_EMBEDDED_IMAGES?.xuanzhi || 'assets/images/poster-bg-jpg/Background_RicePaper.jpg'
     },
     shanshui: {
       name: '山水',
-      image: 'assets/images/Background_Landscape.png'
+      image: window.ZZJ_EMBEDDED_IMAGES?.shanshui || 'assets/images/poster-bg-jpg/Background_Landscape.jpg'
     },
     yunwen: {
       name: '云纹',
-      image: 'assets/images/Background_CloudPattern.png'
+      image: window.ZZJ_EMBEDDED_IMAGES?.yunwen || 'assets/images/poster-bg-jpg/Background_CloudPattern.jpg'
     },
     zhuying: {
       name: '竹影',
-      image: 'assets/images/Background_BambooShadow.png'
+      image: window.ZZJ_EMBEDDED_IMAGES?.zhuying || 'assets/images/poster-bg-jpg/Background_BambooShadow.jpg'
     },
     yinzhang: {
       name: '印章',
-      image: 'assets/images/Background_Seal.png'
+      image: window.ZZJ_EMBEDDED_IMAGES?.yinzhang || 'assets/images/poster-bg-jpg/Background_Seal.jpg'
     },
     moji: {
       name: '墨迹',
-      image: 'assets/images/Background_InkWash.png'
+      image: window.ZZJ_EMBEDDED_IMAGES?.moji || 'assets/images/poster-bg-jpg/Background_InkWash.jpg'
     }
   };
 
-  // 预加载图片缓存
-  const imageCache = {};
   // 背景持久化：从localStorage读取，默认宣纸
   let currentBgId = localStorage.getItem('posterBg') || 'xuanzhi';
   // 请求ID，确保只有最新的generate请求能更新Canvas
   let generateReqId = 0;
+  let lastGenerateData = null;
+  let lastGenerateBgId = null;
 
-  function loadImage(src) {
+  // 图片加载：统一先 fetch 成 Blob，再由 objectURL 绘制到 Canvas。
+  // 这样即使部署在 GitHub Pages / 手机内置浏览器中，也不会因为图片资源
+  // 的响应头或缓存策略导致 Canvas 被污染（Tainted canvas）。
+  const imageCache = {};
+  // 所有海报图片优先使用内嵌 data URL。data URL 不会污染 Canvas，且不受 GitHub Pages、手机内置浏览器缓存/跨域策略影响。
+  async function loadImage(src) {
+    if (imageCache[src]) return imageCache[src];
+    const img = await loadImageElement(src);
+    imageCache[src] = img;
+    return img;
+  }
+
+  function loadImageElement(src) {
     return new Promise((resolve, reject) => {
-      if (imageCache[src]) {
-        resolve(imageCache[src]);
-        return;
-      }
-      // 用fetch+blob方式加载图片，确保Canvas不被污染且能正常加载
-      fetch(src)
-        .then(response => response.blob())
-        .then(blob => {
-          const objectUrl = URL.createObjectURL(blob);
-          const img = new Image();
-          img.onload = () => {
-            imageCache[src] = img;
-            URL.revokeObjectURL(objectUrl);
-            resolve(img);
-          };
-          img.onerror = (e) => {
-            URL.revokeObjectURL(objectUrl);
-            console.error('图片加载失败:', src, e);
-            reject(new Error('图片加载失败: ' + src));
-          };
-          img.src = objectUrl;
-        })
-        .catch(e => {
-          console.error('fetch图片失败:', src, e);
-          // fetch失败时回退到普通Image加载
-          const img = new Image();
-          img.onload = () => {
-            imageCache[src] = img;
-            resolve(img);
-          };
-          img.onerror = (err) => {
-            console.error('图片加载失败:', src, err);
-            reject(new Error('图片加载失败: ' + src));
-          };
-          img.src = src;
-        });
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('图片加载失败: ' + String(src).slice(0, 120)));
+      img.src = src;
     });
   }
 
@@ -86,8 +67,11 @@ const PosterGenerator = (function() {
   function setBackground(bgId) {
     if (backgrounds[bgId]) {
       currentBgId = bgId;
+      lastGenerateBgId = bgId;
       localStorage.setItem('posterBg', bgId);
+      return true;
     }
+    return false;
   }
 
   /**
@@ -110,6 +94,14 @@ const PosterGenerator = (function() {
     // 兼容多种调用方式：bgId传null则使用当前设置的背景
     const useBgId = bgId || currentBgId;
     const bg = backgrounds[useBgId] || backgrounds.xuanzhi;
+    lastGenerateData = data ? { ...data } : {};
+    lastGenerateBgId = useBgId;
+
+    // 先更新可视层背景，保证点击缩略图后立即反馈；Canvas 生成完成后会再把同一背景写入像素。
+    canvas.style.backgroundImage = `url(\"${new URL(bg.image, document.baseURI).href}\")`;
+    canvas.style.backgroundSize = 'cover';
+    canvas.style.backgroundPosition = 'center';
+    canvas.style.backgroundRepeat = 'no-repeat';
 
     // 1. 绘制背景图
     try {
@@ -118,7 +110,12 @@ const PosterGenerator = (function() {
       ctx.drawImage(bgImg, 0, 0, W, H);
     } catch(e) {
       if (reqId !== generateReqId) return;
-      console.error('背景图加载失败，使用纯色兜底:', bg.image, e);
+      console.error('背景图加载失败:', bg.image, e);
+      // 可视画布保留 CSS 背景；离屏导出画布必须明确失败，避免生成一张“看起来成功但没有背景”的海报。
+      if (canvas.id !== 'poster-canvas') {
+        throw new Error('背景图片加载失败：' + bg.name);
+      }
+      ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = '#f5f0e6';
       ctx.fillRect(0, 0, W, H);
     }
@@ -132,11 +129,23 @@ const PosterGenerator = (function() {
     // 5. 绘制最终新造字（必须使用导出的glyphImage，不再重新绘制构件）
     if (!data.glyphImage) {
       if (reqId !== generateReqId) return;
-      console.error('未找到新造字的最终图像 glyphImage');
-      ctx.fillStyle = '#999';
-      ctx.font = '40px "Noto Serif SC", serif';
+      // 最终兜底：即使历史作品没有保存成品图，也至少把当前构件组合绘制到海报，
+      // 不再显示“（新造字）”占位文字。
+      ctx.save();
       ctx.textAlign = 'center';
-      ctx.fillText('（新造字）', W/2, H * 0.38);
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#171614';
+      const comps = Array.isArray(data.components) ? data.components : [];
+      if (comps.length) {
+        const labels = comps.map(c => c.name || c.char || '').filter(Boolean);
+        ctx.font = '300px "Noto Serif SC", serif';
+        ctx.fillText(labels.join(''), W / 2, H * 0.38);
+      } else {
+        ctx.fillStyle = '#999';
+        ctx.font = '40px "Noto Serif SC", serif';
+        ctx.fillText('新造字', W / 2, H * 0.38);
+      }
+      ctx.restore();
     } else {
       try {
         const glyphImg = await loadImage(data.glyphImage);
@@ -527,7 +536,7 @@ const PosterGenerator = (function() {
     ctx.rotate(-0.08);
 
     try {
-      const sealImg = await loadImage('assets/images/seal-zizaoji.png');
+      const sealImg = await loadImage(window.ZZJ_EMBEDDED_IMAGES?.seal || 'assets/images/seal-zizaoji.png');
       ctx.globalAlpha = 0.92;
       ctx.drawImage(sealImg, -size/2, -size/2, size, size);
     } catch(e) {
@@ -586,79 +595,141 @@ const PosterGenerator = (function() {
   /**
    * 保存海报为图片
    */
+  function showMobilePosterSaver(blob, name) {
+    // 手机端（尤其微信/QQ/部分内置浏览器）会拦截 <a download>。
+    // 改为在当前页面打开一个可长按保存的海报预览层，并提供系统分享/保存按钮。
+    const old = document.getElementById('zizaoji-poster-saver');
+    if (old) old.remove();
+
+    const url = URL.createObjectURL(blob);
+    const overlay = document.createElement('div');
+    overlay.id = 'zizaoji-poster-saver';
+    overlay.style.cssText = [
+      'position:fixed','inset:0','z-index:99999','background:rgba(20,20,20,.88)',
+      'display:flex','flex-direction:column','align-items:center','justify-content:center',
+      'padding:18px','box-sizing:border-box'
+    ].join(';');
+
+    const title = document.createElement('div');
+    title.textContent = '海报已生成';
+    title.style.cssText = 'color:#fff;font-size:20px;margin-bottom:8px;font-family:serif;';
+
+    const tip = document.createElement('div');
+    tip.textContent = '长按下方海报图片即可保存到手机';
+    tip.style.cssText = 'color:rgba(255,255,255,.82);font-size:14px;margin-bottom:14px;text-align:center;';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = name;
+    img.style.cssText = 'display:block;max-width:min(92vw,520px);max-height:68vh;width:auto;height:auto;object-fit:contain;border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,.35);-webkit-user-select:none;user-select:none;';
+    img.setAttribute('draggable', 'false');
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center;';
+
+    const shareBtn = document.createElement('button');
+    shareBtn.textContent = '系统分享 / 保存';
+    shareBtn.style.cssText = 'border:0;border-radius:24px;padding:11px 20px;background:#c73737;color:#fff;font-size:15px;';
+    shareBtn.addEventListener('click', async () => {
+      try {
+        const file = new File([blob], name, { type:'image/png' });
+        if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
+          await navigator.share({ files:[file], title:'字造集海报' });
+          return;
+        }
+        alert('当前浏览器不支持系统保存，请长按海报图片保存。');
+      } catch (e) {
+        if (!e || e.name !== 'AbortError') {
+          console.warn('系统分享失败，请长按图片保存:', e);
+          alert('当前浏览器无法直接保存，请长按海报图片保存。');
+        }
+      }
+    });
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '返回页面';
+    closeBtn.style.cssText = 'border:1px solid rgba(255,255,255,.55);border-radius:24px;padding:10px 18px;background:transparent;color:#fff;font-size:15px;';
+    closeBtn.addEventListener('click', () => {
+      overlay.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    actions.appendChild(shareBtn);
+    actions.appendChild(closeBtn);
+    overlay.appendChild(title);
+    overlay.appendChild(tip);
+    overlay.appendChild(img);
+    overlay.appendChild(actions);
+    document.body.appendChild(overlay);
+    return true;
+  }
+
+  /**
+   * 保存海报为图片
+   * 电脑：文件选择器/浏览器下载
+   * 手机：不再触发容易被内置浏览器拦截的自动下载，改为可长按保存的预览层 + 系统分享
+   */
   async function saveAsImage(canvas, fileName) {
     const name = fileName || '字造集_海报.png';
     try {
-      const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Canvas生成图片失败')), 'image/png');
-      });
+      // 永远从当前背景 + 最近一次海报数据重新生成离屏海报，避免屏幕 Canvas 状态与导出状态不同步。
+      const exportCanvas = document.createElement('canvas');
+      const exportData = lastGenerateData || {};
+      const exportBgId = currentBgId || lastGenerateBgId || 'xuanzhi';
+      await generate(exportData, exportBgId, exportCanvas);
 
-      // 电脑端：优先使用原生文件保存窗口；不支持时再走标准下载。
-      if (window.showSaveFilePicker && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      // 所有位图均为 data URL，导出 Canvas 不存在 tainted canvas。
+      const dataUrl = exportCanvas.toDataURL('image/png');
+      if (!dataUrl || dataUrl === 'data:,') throw new Error('PNG 图片生成失败');
+      const blob = dataURLToBlob(dataUrl);
+      if (!blob || !blob.size) throw new Error('PNG 图片为空');
+
+      const isMobile = /Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent);
+      if (isMobile) {
+        showMobilePosterSaver(blob, name);
+        return 'mobile';
+      }
+
+      if (window.showSaveFilePicker) {
         try {
           const handle = await window.showSaveFilePicker({
             suggestedName: name,
-            types: [{ description: 'PNG 图片', accept: { 'image/png': ['.png'] } }]
+            types: [{ description:'PNG 图片', accept:{'image/png':['.png']} }]
           });
           const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
           return true;
         } catch (e) {
-          // 用户取消保存窗口时直接结束；其他兼容性问题继续走下载兜底。
           if (e && e.name === 'AbortError') return false;
-          console.warn('原生文件保存不可用，改用浏览器下载:', e);
+          console.warn('文件选择保存不可用，改用浏览器下载:', e);
         }
       }
 
       const url = URL.createObjectURL(blob);
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-      // 手机端优先调用系统分享/“存储到文件”等能力，避免部分手机浏览器不执行 download 属性。
-      if (isMobile && navigator.share && window.File) {
-        try {
-          const file = new File([blob], name, { type: 'image/png' });
-          if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: '字造集海报' });
-            URL.revokeObjectURL(url);
-            return true;
-          }
-        } catch (e) {
-          if (e && e.name === 'AbortError') {
-            URL.revokeObjectURL(url);
-            return false;
-          }
-          console.warn('手机系统分享不可用，改用下载/新页兜底:', e);
-        }
-      }
-
-      // 标准浏览器下载：电脑 Chrome/Edge/Firefox 及支持 download 的手机浏览器。
       const link = document.createElement('a');
-      link.download = name;
       link.href = url;
+      link.download = name;
       link.rel = 'noopener';
       document.body.appendChild(link);
       link.click();
       link.remove();
-
-      // 某些内置浏览器会忽略 download；给出同一图片的新页面作为最终兜底，用户可长按/右键保存。
-      if (isMobile) {
-        setTimeout(() => {
-          try {
-            const opened = window.open(url, '_blank');
-            if (!opened) console.warn('浏览器阻止了新窗口兜底');
-          } catch (e) {
-            console.warn('图片新页兜底失败:', e);
-          }
-        }, 350);
-      }
-      setTimeout(() => URL.revokeObjectURL(url), isMobile ? 15000 : 1500);
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
       return true;
     } catch (e) {
       console.error('海报保存失败:', e);
-      alert('海报保存失败：' + (e.message || e) + '\n请重试。');
+      alert('海报保存失败：' + (e.message || e));
       return false;
     }
+  }
+
+  function dataURLToBlob(dataUrl) {
+    const parts = dataUrl.split(',');
+    const mime = (parts[0].match(/:(.*?);/) || [,'image/png'])[1];
+    const binary = atob(parts[1]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
   }
 
   /**

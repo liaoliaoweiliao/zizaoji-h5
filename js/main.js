@@ -1136,6 +1136,8 @@ if (index >= 3) {
       };
       sessionStorage.setItem('createdGlyph', JSON.stringify(glyph));
       AppState.createdGlyph = glyph;
+      // 同步保存到当前作品，保证进入海报页、刷新页面后仍能显示真正的新造字。
+      AppState.currentChar.glyphImage = dataUrl;
       return glyph;
     } catch(e) {
       console.error('html2canvas截图失败，回退到Canvas绘制:', e);
@@ -1192,6 +1194,8 @@ if (index >= 3) {
     };
     sessionStorage.setItem('createdGlyph', JSON.stringify(glyph));
     AppState.createdGlyph = glyph;
+    // 将最终新造字图像同步挂到当前作品，保证进入海报页或刷新后仍能恢复。
+    AppState.currentChar.glyphImage = dataUrl;
     return glyph;
   }
 
@@ -1680,13 +1684,16 @@ if (index >= 3) {
       structure: AppState.currentChar.structure,
       structureType: AppState.currentChar.structureType,
       structureName: getStructureName(),
+      freeLayout: AppState.currentChar.freeLayout || null,
       meaning: AppState.currentChar.meaning,
       style: AppState.currentChar.style,
       styleName: getStyleName(),
       personality: AppState.currentChar.personality,
       charName: AppState.currentChar.components.map(c => c.name).join(''),
       userName: AppState.userName,
-      charIndex: getCharIndexName()
+      charIndex: getCharIndexName(),
+      // 持久化新造字成品图，避免刷新/重新进入海报页后只剩“（新造字）”占位符。
+      glyphImage: AppState.createdGlyph?.image || AppState.currentChar.glyphImage || null
     };
     AppState.collection.unshift(char);
     saveCollection();
@@ -1715,8 +1722,14 @@ if (index >= 3) {
   async function generatePoster() {
     const canvas = $('#poster-canvas');
     const char = AppState.collection[0] || AppState.currentChar;
-    // 读取前面完成造字时导出的完整新字图像
-    const glyph = AppState.createdGlyph || JSON.parse(sessionStorage.getItem('createdGlyph') || 'null');
+
+    // 优先使用当前内存中的成品，其次读取已持久化到作品记录里的成品图。
+    let glyph = AppState.createdGlyph || null;
+    if (!glyph) {
+      try { glyph = JSON.parse(sessionStorage.getItem('createdGlyph') || 'null'); } catch (_) {}
+    }
+    const persistedGlyphImage = glyph?.image || char?.glyphImage || AppState.currentChar?.glyphImage || null;
+
     const posterData = {
       ...char,
       components: char.components,
@@ -1725,9 +1738,10 @@ if (index >= 3) {
       userName: AppState.userName,
       year: '2026',
       charIndex: char.charIndex || '第一个',
-      glyphImage: glyph ? glyph.image : null
+      glyphImage: persistedGlyphImage
     };
-    // 设置当前背景，传null让generate使用内部currentBgId
+
+    // 设置当前背景，传null让generate使用内部currentBgId。
     PosterGenerator.setBackground(AppState.posterBg);
     await PosterGenerator.generate(posterData, null, canvas);
   }
@@ -1742,12 +1756,23 @@ if (index >= 3) {
             title="${bg.name}"></div>`
     ).join('');
     container.querySelectorAll('.bg-dot').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', async () => {
+        const bgId = el.dataset.bg;
         AudioEngine.playSfx('chime', -16, 300);
-         AppState.posterBg = el.dataset.bg;
-        PosterGenerator.setBackground(el.dataset.bg);
+        AppState.posterBg = bgId;
+        localStorage.setItem('posterBg', bgId);
+        PosterGenerator.setBackground(bgId);
+        // 立即更新可视背景，随后再异步重绘 Canvas；避免手机端点击后看起来没有切换。
+        const posterCanvas = $('#poster-canvas');
+        const bgDef = bgs.find(item => item.id === bgId);
+        if (posterCanvas && bgDef) {
+          posterCanvas.style.backgroundImage = `url(\"${new URL(bgDef.image, document.baseURI).href}\")`;
+          posterCanvas.style.backgroundSize = 'cover';
+          posterCanvas.style.backgroundPosition = 'center';
+          posterCanvas.style.backgroundRepeat = 'no-repeat';
+        }
         renderBgSwitcher();
-        generatePoster();
+        await generatePoster();
       });
     });
   }
@@ -1756,7 +1781,8 @@ if (index >= 3) {
     $('#btn-save-poster').addEventListener('click', async () => {
       const canvas = $('#poster-canvas');
       const success = await PosterGenerator.saveAsImage(canvas, `字造集_${AppState.userName}_${Date.now()}.png`);
-      if (success) showToast('海报已保存');
+      if (success === 'mobile') showToast('海报已生成，请长按图片保存');
+      else if (success) showToast('海报已保存');
     });
 
     $('#btn-new-char').addEventListener('click', () => {
@@ -1783,6 +1809,34 @@ if (index >= 3) {
   }
 
   // ===== P10 字造集 =====
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  function renderCollectionGlyph(char) {
+    const image = char?.glyphImage;
+    if (image) {
+      return `<img class="collection-glyph-image" src="${escapeHtml(image)}" alt="用户造字" draggable="false">`;
+    }
+
+    const comps = Array.isArray(char?.components) ? char.components : [];
+    const labels = comps.map(c => c?.name || c?.char || '').filter(Boolean).slice(0, 2);
+    if (!labels.length) return '<span class="collection-glyph-fallback">字</span>';
+    if (labels.length === 1) return `<span class="collection-glyph-fallback single">${escapeHtml(labels[0])}</span>`;
+
+    const type = char?.structureType || '';
+    let a = 'collection-glyph-part part-a', b = 'collection-glyph-part part-b';
+    if (String(char?.structure || '').includes('top_bottom') || String(type).startsWith('tb_')) {
+      a += ' tb'; b += ' tb';
+    } else if (String(char?.structure || '').includes('enclosing') || String(type).startsWith('en_')) {
+      a += ' en'; b += ' en';
+    }
+    return `<span class="collection-glyph-composite" aria-label="用户造字">
+      <span class="${a}">${escapeHtml(labels[0])}</span>
+      <span class="${b}">${escapeHtml(labels[1])}</span>
+    </span>`;
+  }
+
   function renderCollection() {
     const grid = $('#collection-grid');
     if (AppState.collection.length === 0) {
@@ -1795,11 +1849,13 @@ if (index >= 3) {
       return;
     }
 
+    // 字卡必须展示用户实际完成的“新造字”成品，而不是把两个构件名称直接拼成“山水”。
+    // 新作品优先使用造字工坊导出的 glyphImage；历史作品若没有成品图，则按其结构重建为单一合成字图。
     grid.innerHTML = AppState.collection.map((char, i) => `
       <div class="collection-card" data-index="${i}">
-        <div class="char">${char.charName || '字'}</div>
-        <div class="name">${char.styleName || '创意字'}</div>
-        <div class="style-tag">${char.personality?.name || '造字师'}</div>
+        <div class="char glyph-result">${renderCollectionGlyph(char)}</div>
+        <div class="name">${escapeHtml(char.styleName || '创意字')}</div>
+        <div class="style-tag">${escapeHtml(char.personality?.name || '造字师')}</div>
       </div>
     `).join('');
 
