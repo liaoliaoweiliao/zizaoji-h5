@@ -187,7 +187,7 @@
     function setMeaningStyle(styleId) {
       // 三种风格严格对应设计表：古风/当代使用 meaning-story，极简使用 home-guqin。
       const key = styleId === 'minimal' ? 'bgmHome' : 'bgmMeaning';
-      const db = styleId === 'minimal' ? -21 : (styleId === 'modern' ? -20 : -19);
+      const db = styleId === 'minimal' ? -16 : (styleId === 'modern' ? -15 : -14);
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; return; }
       startBgm(key, db, false);
     }
@@ -1716,23 +1716,9 @@ if (index >= 3) {
 
   function calculatePersonality() {
     const personalities = AppState.presets.personalities || [];
-    const char = AppState.currentChar;
-    const compIds = char.components.map(c => c.id);
-
-    // 情绪造字师
-    if (compIds.includes('heart') && char.style === 'modern') {
-      return personalities.find(p => p.id === 'emotion_crafter') || personalities[0];
-    }
-    // 象形观察家
-    if (char.components.length === 1 && char.components[0].category === 'nature') {
-      return personalities.find(p => p.id === 'xiangxing_observer') || personalities[0];
-    }
-    // 构形设计师
-    if (char.customLayout || char.structure === 'enclosing') {
-      return personalities.find(p => p.id === 'structure_designer') || personalities[0];
-    }
-    // 默认会意魔法师
-    return personalities.find(p => p.id === 'huiyi_mage') || personalities[0];
+    if (!personalities.length) return { name: '会意魔法师', description: '' };
+    // 造字人格随机四选一，并保存到作品记录
+    return personalities[Math.floor(Math.random() * personalities.length)];
   }
 
   // ===== 古籍字卡 =====
@@ -1850,7 +1836,7 @@ if (index >= 3) {
 
   function getStyleName() {
     const styles = AppState.presets.interpretationStyles || {};
-    return styles[AppState.currentChar.style]?.name || '古风雅致';
+    return AppState.currentChar.style ? (styles[AppState.currentChar.style]?.name || '') : '';
   }
 
   function getCharIndexName() {
@@ -1995,7 +1981,7 @@ if (index >= 3) {
     grid.innerHTML = AppState.collection.map((char, i) => `
       <div class="collection-card" data-index="${i}">
         <div class="char glyph-result">${renderCollectionGlyph(char)}</div>
-        <div class="name">${escapeHtml(char.styleName || '创意字')}</div>
+        ${char.styleName ? `<div class="name">${escapeHtml(char.styleName)}</div>` : ''}
         <div class="style-tag">${escapeHtml(char.personality?.name || '造字师')}</div>
       </div>
     `).join('');
