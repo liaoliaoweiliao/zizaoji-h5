@@ -26,7 +26,7 @@
       structure: 'left_right',
       structureType: 'lr_standard',
       meaning: '',
-      style: 'classical',
+      style: null,
       personality: null,
       customLayout: false
     },
@@ -187,7 +187,7 @@
     function setMeaningStyle(styleId) {
       // 三种风格严格对应设计表：古风/当代使用 meaning-story，极简使用 home-guqin。
       const key = styleId === 'minimal' ? 'bgmHome' : 'bgmMeaning';
-      const db = styleId === 'minimal' ? -16 : (styleId === 'modern' ? -15 : -14);
+      const db = styleId === 'minimal' ? -12 : (styleId === 'modern' ? -11 : -10);
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; return; }
       startBgm(key, db, false);
     }
@@ -1715,10 +1715,18 @@ if (index >= 3) {
   }
 
   function calculatePersonality() {
-    const personalities = AppState.presets.personalities || [];
-    if (!personalities.length) return { name: '会意魔法师', description: '' };
-    // 造字人格随机四选一，并保存到作品记录
-    return personalities[Math.floor(Math.random() * personalities.length)];
+    const fallback = [
+      { name: '会意魔法师', description: '擅长将不同意象组合成新的心意。' },
+      { name: '象形观察家', description: '善于从万物形态中发现新的表达。' },
+      { name: '构形设计师', description: '专注结构与秩序，创造独特字形。' },
+      { name: '情绪造字师', description: '用情感连接笔画与意义。' }
+    ];
+    const personalities = (AppState.presets.personalities || []).filter(p =>
+      ['会意魔法师','象形观察家','构形设计师','情绪造字师'].includes(p.name)
+    );
+    const pool = personalities.length === 4 ? personalities : fallback;
+    // 随机一次，结果由 saveCurrentChar 持久化，不随查看变化
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   // ===== 古籍字卡 =====
@@ -1928,7 +1936,7 @@ if (index >= 3) {
       structure: 'left_right',
       structureType: 'lr_standard',
       meaning: '',
-      style: 'classical',
+      style: null,
       personality: null,
       customLayout: false
     };
@@ -2010,7 +2018,10 @@ if (index >= 3) {
     $('#detail-components').textContent = char.components?.map(c => c.name).join(' + ') || '';
     $('#detail-structure').textContent = char.structureName || '';
     $('#detail-meaning').textContent = char.meaning || '';
-    $('#detail-style').textContent = char.styleName || '';
+    const styleDetail = $('#detail-style');
+    const styleSection = styleDetail?.closest('.detail-section');
+    if (styleDetail) styleDetail.textContent = char.styleName || '';
+    if (styleSection) styleSection.style.display = char.styleName ? '' : 'none';
     $('#detail-personality').textContent = char.personality?.name || '';
     $('#detail-date').textContent = new Date(char.createdAt).toLocaleDateString('zh-CN');
 
