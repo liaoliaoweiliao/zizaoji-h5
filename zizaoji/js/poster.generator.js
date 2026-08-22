@@ -53,14 +53,57 @@ const PosterGenerator = (function() {
     return img;
   }
 
-  function loadImageElement(src) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.decoding = 'async';
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('图片加载失败: ' + String(src).slice(0, 120)));
-      img.src = src;
-    });
+  async function loadImageElement(src) {
+    // Canvas 导出最容易在这里被污染：只要有一张跨源图片直接进入 Canvas，
+    // 后续 toBlob()/toDataURL() 就会抛出 "Tainted canvases may not be exported"。
+    // 项目内的图片全部先转换成 data/blob URL，再交给 Image 绘制，避免这个问题。
+    const source = String(src || '');
+    if (!source) throw new Error('图片地址为空');
+
+    if (/^data:/i.test(source) || /^blob:/i.test(source)) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('图片加载失败: ' + source.slice(0, 120)));
+        img.src = source;
+      });
+    }
+
+    // 优先 fetch 为同源 Blob。Blob URL 绘制到 Canvas 后不会因为原始 URL 的
+    // CORS/缓存响应头而污染 Canvas。
+    try {
+      const response = await fetch(new URL(source, document.baseURI).href, {
+        mode: 'same-origin',
+        credentials: 'same-origin',
+        cache: 'force-cache'
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        return await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.decoding = 'async';
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error('Blob 图片加载失败'));
+          img.src = objectUrl;
+        });
+      } catch (e) {
+        URL.revokeObjectURL(objectUrl);
+        throw e;
+      }
+    } catch (fetchError) {
+      // 最后的兼容兜底：明确设置 crossOrigin，再尝试直接加载。
+      return await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('图片加载失败: ' + source.slice(0, 120)));
+        img.src = new URL(source, document.baseURI).href;
+      });
+    }
   }
 
   // 设置当前背景并持久化
@@ -595,7 +638,7 @@ const PosterGenerator = (function() {
   /**
    * 保存海报为图片
    */
-  function showMobilePosterSaver(blob, name) {
+  function showMobilePosterSaver(blob, name, dataUrl) {
     // 手机端（尤其微信/QQ/部分内置浏览器）会拦截 <a download>。
     // 改为在当前页面打开一个可长按保存的海报预览层，并提供系统分享/保存按钮。
     const old = document.getElementById('zizaoji-poster-saver');
@@ -619,7 +662,9 @@ const PosterGenerator = (function() {
     tip.style.cssText = 'color:rgba(255,255,255,.82);font-size:14px;margin-bottom:14px;text-align:center;';
 
     const img = document.createElement('img');
-    img.src = url;
+    // data URL 比 blob URL 更适合微信、QQ、部分国产浏览器的长按保存。
+    // blob 仍保留给系统分享使用。
+    img.src = dataUrl || url;
     img.alt = name;
     img.style.cssText = 'display:block;max-width:min(92vw,520px);max-height:68vh;width:auto;height:auto;object-fit:contain;border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,.35);-webkit-user-select:none;user-select:none;';
     img.setAttribute('draggable', 'false');
@@ -678,15 +723,19 @@ const PosterGenerator = (function() {
       const exportBgId = currentBgId || lastGenerateBgId || 'xuanzhi';
       await generate(exportData, exportBgId, exportCanvas);
 
-      // 所有位图均为 data URL，导出 Canvas 不存在 tainted canvas。
-      const dataUrl = exportCanvas.toDataURL('image/png');
-      if (!dataUrl || dataUrl === 'data:,') throw new Error('PNG 图片生成失败');
-      const blob = dataURLToBlob(dataUrl);
+      // 统一从安全加载的离屏 Canvas 导出 PNG。
+      const blob = await exportCanvasBlob(exportCanvas);
       if (!blob || !blob.size) throw new Error('PNG 图片为空');
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('PNG 读取失败'));
+        reader.readAsDataURL(blob);
+      });
 
       const isMobile = /Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent);
       if (isMobile) {
-        showMobilePosterSaver(blob, name);
+        showMobilePosterSaver(blob, name, dataUrl);
         return 'mobile';
       }
 
@@ -730,6 +779,40 @@ const PosterGenerator = (function() {
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type: mime });
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      if (!canvas) return reject(new Error('海报画布不存在'));
+      try {
+        canvas.toBlob(blob => {
+          if (blob && blob.size) resolve(blob);
+          else reject(new Error('Canvas 未生成有效 PNG'));
+        }, 'image/png', 1);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  async function exportCanvasBlob(canvas) {
+    // 优先 toBlob；部分老旧手机浏览器 toBlob 实现不稳定，再回退到 toDataURL。
+    try {
+      return await canvasToBlob(canvas);
+    } catch (blobError) {
+      console.warn('Canvas.toBlob 失败，尝试 toDataURL:', blobError);
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        if (!dataUrl || dataUrl === 'data:,') throw new Error('PNG 数据为空');
+        return dataURLToBlob(dataUrl);
+      } catch (dataError) {
+        const message = String(dataError?.message || dataError || '');
+        if (/tainted|origin-clean|not be exported/i.test(message)) {
+          throw new Error('海报中仍存在未安全加载的图片资源，请刷新页面后重新生成海报');
+        }
+        throw dataError;
+      }
+    }
   }
 
   /**

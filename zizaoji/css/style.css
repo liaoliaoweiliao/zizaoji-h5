@@ -852,6 +852,7 @@ body::before {
   position: relative;
   overflow: hidden;
 }
+
 .char-canvas::before {
   content: '';
   position: absolute;
@@ -875,6 +876,7 @@ body::before {
   cursor: move;
   touch-action: none;
   transition: box-shadow 0.2s;
+  transform-origin: center center;
 }
 .canvas-component.selected {
   outline: 2px dashed var(--color-seal);
@@ -1823,6 +1825,22 @@ body::before {
   cursor: pointer;
   font-size: 18px;
 }
+.transform-hint {
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-muted);
+  text-align: center;
+}
+
+.detail-char img {
+  display: block;
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
 .detail-char {
   font-family: var(--font-ancient);
   font-size: 80px;

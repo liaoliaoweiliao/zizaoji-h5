@@ -892,6 +892,7 @@ if (index >= 3) {
 
     if (comps.length === 0) {
       canvas.innerHTML = '<div class="canvas-empty-hint">从下方选择构件<br>开始造字</div>';
+      syncTransformPanel(null);
       $('#btn-generate').disabled = true;
       canvas.classList.remove('free-mode');
       return;
@@ -987,6 +988,12 @@ if (index >= 3) {
     el.textContent = comp.name;
     el.dataset.id = comp.id;
     el.dataset.componentId = comp.id;
+    // 记录初始尺寸。宽/高调整以此为基准，真正改变构件字形的横纵比例，
+    // 而不是只改变外面的空白盒子。
+    el.dataset.baseW = String(w);
+    el.dataset.baseH = String(h);
+    el.dataset.rotate = '0';
+    applyComponentTransform(el);
     return el;
   }
 
@@ -1006,10 +1013,12 @@ if (index >= 3) {
   }
 
   function initWorkshop() {
+    initComponentTransformPanel();
     $('#btn-clear-canvas').addEventListener('click', () => {
       AppState.currentChar.components = [];
       AppState.selectedComponentIndex = -1;
       AppState.currentChar.customLayout = false;
+      syncTransformPanel(null);
       renderComponentLibrary();
       updateCanvas();
     });
@@ -1083,9 +1092,14 @@ if (index >= 3) {
       const h = parseFloat(el.style.height) || 100;
       el.style.left = (x * scale + offsetX) + 'px';
       el.style.top = (y * scale + offsetY) + 'px';
-      el.style.width = (w * scale) + 'px';
-      el.style.height = (h * scale) + 'px';
-      el.style.fontSize = Math.min(w * scale, h * scale) * 0.7 + 'px';
+      const newW = w * scale;
+      const newH = h * scale;
+      el.style.width = newW + 'px';
+      el.style.height = newH + 'px';
+      // 自动收字后把当前尺寸作为新的基准，避免已有宽窄比例被重复放大。
+      el.dataset.baseW = String(newW);
+      el.dataset.baseH = String(newH);
+      applyComponentTransform(el);
     });
   }
 
@@ -1101,6 +1115,10 @@ if (index >= 3) {
         y: parseFloat(el.style.top) || 0,
         w: parseFloat(el.style.width) || 100,
         h: parseFloat(el.style.height) || 100,
+        baseW: parseFloat(el.dataset.baseW) || parseFloat(el.style.width) || 100,
+        baseH: parseFloat(el.dataset.baseH) || parseFloat(el.style.height) || 100,
+        widthRatio: parseFloat(el.dataset.widthRatio) || 1,
+        heightRatio: parseFloat(el.dataset.heightRatio) || 1,
         rotate: el.dataset.rotate || 0
       });
     });
@@ -1170,12 +1188,17 @@ if (index >= 3) {
       const rotate = parseFloat(el.dataset.rotate) || 0;
       const char = el.textContent;
       const fontFamily = getComputedStyle(el).fontFamily;
+      const baseW = parseFloat(el.dataset.baseW) || w;
+      const baseH = parseFloat(el.dataset.baseH) || h;
+      const sx = Math.max(0.35, Math.min(3, w / baseW));
+      const sy = Math.max(0.35, Math.min(3, h / baseH));
 
       ctx.save();
       ctx.translate(x + w / 2, y + h / 2);
       ctx.rotate(rotate * Math.PI / 180);
+      ctx.scale(sx, sy);
       ctx.fillStyle = '#171614';
-      ctx.font = `${Math.min(w, h) * 0.7}px ${fontFamily}`;
+      ctx.font = `${Math.min(baseW, baseH) * 0.7}px ${fontFamily}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(char, 0, 0);
@@ -1199,6 +1222,108 @@ if (index >= 3) {
     return glyph;
   }
 
+  function applyComponentTransform(el) {
+    if (!el) return;
+    const w = parseFloat(el.style.width) || 100;
+    const h = parseFloat(el.style.height) || 100;
+    const baseW = parseFloat(el.dataset.baseW) || w;
+    const baseH = parseFloat(el.dataset.baseH) || h;
+    const rotate = parseFloat(el.dataset.rotate) || 0;
+    const sx = Math.max(0.35, Math.min(3, w / baseW));
+    const sy = Math.max(0.35, Math.min(3, h / baseH));
+    el.style.transformOrigin = 'center center';
+    el.style.transform = `scaleX(${sx}) scaleY(${sy}) rotate(${rotate}deg)`;
+    el.style.fontSize = Math.min(baseW, baseH) * 0.7 + 'px';
+    el.dataset.widthRatio = String(sx);
+    el.dataset.heightRatio = String(sy);
+  }
+
+  function syncTransformPanel(el) {
+    const panel = $('#component-transform-panel');
+    if (!panel) return;
+    if (!el) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    const w = parseFloat(el.style.width) || 100;
+    const h = parseFloat(el.style.height) || 100;
+    const baseW = parseFloat(el.dataset.baseW) || w;
+    const baseH = parseFloat(el.dataset.baseH) || h;
+    const widthRange = $('#component-width-range');
+    const heightRange = $('#component-height-range');
+    const widthValue = $('#component-width-value');
+    const heightValue = $('#component-height-value');
+    if (widthRange) widthRange.value = Math.round((w / baseW) * 100);
+    if (heightRange) heightRange.value = Math.round((h / baseH) * 100);
+    if (widthValue) widthValue.textContent = `${Math.round((w / baseW) * 100)}%`;
+    if (heightValue) heightValue.textContent = `${Math.round((h / baseH) * 100)}%`;
+  }
+
+  function getSelectedCanvasComponent() {
+    return document.querySelector('#char-canvas .canvas-component.selected');
+  }
+
+  // 清理旧版本可能残留的部件操作提示文字。
+  // 当前版本不显示任何“双指横向拉伸……”提示，只保留比例控制面板本身。
+  function removeLegacyTransformHint() {
+  }
+
+  function initComponentTransformPanel() {
+    removeLegacyTransformHint();
+    const panel = $('#component-transform-panel');
+    if (!panel) return;
+    const widthRange = $('#component-width-range');
+    const heightRange = $('#component-height-range');
+    const widthValue = $('#component-width-value');
+    const heightValue = $('#component-height-value');
+
+    const updateDimension = (dimension, value) => {
+      const el = getSelectedCanvasComponent();
+      if (!el) return;
+      const base = parseFloat(el.dataset[dimension === 'width' ? 'baseW' : 'baseH']) || 100;
+      const oldW = parseFloat(el.style.width) || 100;
+      const oldH = parseFloat(el.style.height) || 100;
+      const next = Math.max(40, Math.min(320, base * (Number(value) / 100)));
+      const cx = (parseFloat(el.style.left) || 0) + oldW / 2;
+      const cy = (parseFloat(el.style.top) || 0) + oldH / 2;
+      if (dimension === 'width') {
+        el.style.width = next + 'px';
+        el.style.left = (cx - next / 2) + 'px';
+        if (widthValue) widthValue.textContent = `${Math.round(Number(value))}%`;
+      } else {
+        el.style.height = next + 'px';
+        el.style.top = (cy - next / 2) + 'px';
+        if (heightValue) heightValue.textContent = `${Math.round(Number(value))}%`;
+      }
+      applyComponentTransform(el);
+      saveFreeLayout();
+    };
+
+    widthRange?.addEventListener('input', e => updateDimension('width', e.target.value));
+    heightRange?.addEventListener('input', e => updateDimension('height', e.target.value));
+
+    $('#component-transform-reset')?.addEventListener('click', () => {
+      const el = getSelectedCanvasComponent();
+      if (!el) return;
+      const baseW = parseFloat(el.dataset.baseW) || 100;
+      const baseH = parseFloat(el.dataset.baseH) || 100;
+      const oldW = parseFloat(el.style.width) || baseW;
+      const oldH = parseFloat(el.style.height) || baseH;
+      const cx = (parseFloat(el.style.left) || 0) + oldW / 2;
+      const cy = (parseFloat(el.style.top) || 0) + oldH / 2;
+      el.style.width = baseW + 'px';
+      el.style.height = baseH + 'px';
+      el.style.left = (cx - baseW / 2) + 'px';
+      el.style.top = (cy - baseH / 2) + 'px';
+      applyComponentTransform(el);
+      syncTransformPanel(el);
+      saveFreeLayout();
+    });
+
+    panel.hidden = true;
+  }
+
   // 使构件可拖动、缩放、旋转
   function makeEditable(el) {
     let isDragging = false;
@@ -1212,6 +1337,7 @@ if (index >= 3) {
       // 选中
       document.querySelectorAll('.canvas-component.selected').forEach(s => s.classList.remove('selected'));
       el.classList.add('selected');
+      syncTransformPanel(el);
        const compId = el.dataset.componentId;
        const elementKey = { sun:'sun', moon:'moon', mountain:'mountain', water:'water', fire:'fire', tree:'wood', wood:'wood', earth:'earth' }[compId];
        if (elementKey) AudioEngine.playSfx(elementKey, ({sun:-15,moon:-17,mountain:-14,water:-16,fire:-14,wood:-17,earth:-15}[elementKey] || -16), 1000);
@@ -1228,8 +1354,8 @@ if (index >= 3) {
         isResizing = true;
         startX = e.clientX;
         startY = e.clientY;
-        startW = rect.width;
-        startH = rect.height;
+        startW = parseFloat(el.style.width) || rect.width;
+        startH = parseFloat(el.style.height) || rect.height;
       }
       // 判断是否点击了旋转控制点（顶部）
       else if (relY < -10 || (relY < 15 && relX > rect.width / 2 - 15 && relX < rect.width / 2 + 15)) {
@@ -1260,12 +1386,13 @@ if (index >= 3) {
         const newH = Math.max(30, startH + dy);
         el.style.width = newW + 'px';
         el.style.height = newH + 'px';
-        el.style.fontSize = Math.min(newW, newH) * 0.7 + 'px';
+        applyComponentTransform(el);
+        syncTransformPanel(el);
       } else if (isRotating) {
         const dx = e.clientX - startX;
         const rotate = startRotate + dx * 0.5;
         el.dataset.rotate = rotate;
-        el.style.transform = `rotate(${rotate}deg)`;
+        applyComponentTransform(el);
       }
     });
 
@@ -1278,6 +1405,8 @@ if (index >= 3) {
     // 手机触摸：单指拖动；双指捏住后同时缩放 + 旋转。
     let pinchActive = false;
     let pinchStartDistance = 0;
+    let pinchStartXDistance = 0;
+    let pinchStartYDistance = 0;
     let pinchStartAngle = 0;
     let pinchStartW = 0;
     let pinchStartH = 0;
@@ -1291,6 +1420,7 @@ if (index >= 3) {
     el.addEventListener('touchstart', (e) => {
       document.querySelectorAll('.canvas-component.selected').forEach(s => s.classList.remove('selected'));
       el.classList.add('selected');
+      syncTransformPanel(el);
       e.stopPropagation();
 
       if (e.touches.length >= 2) {
@@ -1299,6 +1429,10 @@ if (index >= 3) {
         isDragging = false;
         const a = e.touches[0], b = e.touches[1];
         pinchStartDistance = Math.max(1, touchDistance(a, b));
+        // 分别记录双指的横向/纵向间距：横向拉开只改变“宽窄”，
+        // 纵向拉开只改变“高矮”，因此可以用双指自由调整部件宽窄比例。
+        pinchStartXDistance = Math.max(1, Math.abs(b.clientX - a.clientX));
+        pinchStartYDistance = Math.max(1, Math.abs(b.clientY - a.clientY));
         pinchStartAngle = touchAngle(a, b);
         pinchStartW = parseFloat(el.style.width) || el.getBoundingClientRect().width;
         pinchStartH = parseFloat(el.style.height) || el.getBoundingClientRect().height;
@@ -1322,10 +1456,19 @@ if (index >= 3) {
       if (pinchActive && e.touches.length >= 2) {
         const a = e.touches[0], b = e.touches[1];
         const distance = Math.max(1, touchDistance(a, b));
-        const scale = Math.max(0.45, Math.min(2.4, distance / pinchStartDistance));
+        const xDistance = Math.max(1, Math.abs(b.clientX - a.clientX));
+        const yDistance = Math.max(1, Math.abs(b.clientY - a.clientY));
+        // 双指横向移动控制宽度、纵向移动控制高度；保留对角捏合时的整体缩放感。
+        // 这样不再是固定等比缩放，可以真正把“山”拉窄/拉宽、“水”压扁/拉高。
+        let widthScale = xDistance / pinchStartXDistance;
+        let heightScale = yDistance / pinchStartYDistance;
+        if (pinchStartXDistance < 12) widthScale = distance / pinchStartDistance;
+        if (pinchStartYDistance < 12) heightScale = distance / pinchStartDistance;
+        widthScale = Math.max(0.45, Math.min(2.4, widthScale));
+        heightScale = Math.max(0.45, Math.min(2.4, heightScale));
         const angleDelta = touchAngle(a, b) - pinchStartAngle;
-        const newW = Math.max(34, Math.min(320, pinchStartW * scale));
-        const newH = Math.max(34, Math.min(320, pinchStartH * scale));
+        const newW = Math.max(34, Math.min(320, pinchStartW * widthScale));
+        const newH = Math.max(34, Math.min(320, pinchStartH * heightScale));
         const rotate = pinchStartRotate + angleDelta;
 
         // 以双指中心为视觉锚点，尺寸变化时同步修正位置，手感更稳定。
@@ -1335,9 +1478,9 @@ if (index >= 3) {
         el.style.height = newH + 'px';
         el.style.left = (startCenterX - newW / 2) + 'px';
         el.style.top = (startCenterY - newH / 2) + 'px';
-        el.style.fontSize = Math.min(newW, newH) * 0.7 + 'px';
         el.dataset.rotate = rotate;
-        el.style.transform = `rotate(${rotate}deg)`;
+        applyComponentTransform(el);
+        syncTransformPanel(el);
         e.preventDefault();
         return;
       }
@@ -1353,11 +1496,18 @@ if (index >= 3) {
     }, { passive: false });
 
     el.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) pinchActive = false;
+      if (e.touches.length < 2) {
+        if (pinchActive) {
+          saveFreeLayout();
+          syncTransformPanel(el);
+        }
+        pinchActive = false;
+      }
       if (e.touches.length === 0) isDragging = false;
     });
 
     el.addEventListener('touchcancel', () => {
+      if (pinchActive) saveFreeLayout();
       pinchActive = false;
       isDragging = false;
     });
@@ -1871,7 +2021,15 @@ if (index >= 3) {
     const char = AppState.collection[index];
     if (!char) return;
 
-    $('#detail-char').textContent = char.charName || '字';
+    // 详情页顶部必须显示用户真正完成的“新造字”成品，不能把两个构件名称直接拼起来。
+    const detailChar = $('#detail-char');
+    if (detailChar) {
+      if (char.glyphImage) {
+        detailChar.innerHTML = `<img src="${escapeHtml(char.glyphImage)}" alt="用户新造字" draggable="false">`;
+      } else {
+        detailChar.textContent = char.charName || '新造字';
+      }
+    }
     $('#detail-components').textContent = char.components?.map(c => c.name).join(' + ') || '';
     $('#detail-structure').textContent = char.structureName || '';
     $('#detail-meaning').textContent = char.meaning || '';
