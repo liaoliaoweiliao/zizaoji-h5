@@ -67,7 +67,7 @@
       earth: 'element/earth.mp3'
     };
     const bgmVolumes = {
-      home: -20, loading: -19, lab: -19, ability: -20, workshop: -19,
+      home: -12, loading: -12, lab: -19, ability: -20, workshop: -19,
       analysis: -21, meaning: -19, charcard: -18, certify: -17,
       poster: -19, collection: -21
     };
@@ -1402,20 +1402,21 @@ if (index >= 3) {
       isRotating = false;
     });
 
-    // 手机触摸：单指拖动；双指捏住后同时缩放 + 旋转。
+    // 手机触摸：单指拖动；双指捏住时独立调整宽度和高度。
+    // 规则：双指左右横向拉开/收拢 => 宽度；上下竖向拉开/收拢 => 高度。
+    // 不改变位置、不改变旋转，允许自由组合出任意宽窄比例。
     let pinchActive = false;
-    let pinchStartDistance = 0;
     let pinchStartXDistance = 0;
     let pinchStartYDistance = 0;
-    let pinchStartAngle = 0;
     let pinchStartW = 0;
     let pinchStartH = 0;
-    let pinchStartRotate = 0;
     let pinchStartLeft = 0;
     let pinchStartTop = 0;
 
-    const touchDistance = (a, b) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-    const touchAngle = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+    const touchAxisDistance = (a, b) => ({
+      x: Math.abs(b.clientX - a.clientX),
+      y: Math.abs(b.clientY - a.clientY)
+    });
 
     el.addEventListener('touchstart', (e) => {
       document.querySelectorAll('.canvas-component.selected').forEach(s => s.classList.remove('selected'));
@@ -1424,19 +1425,14 @@ if (index >= 3) {
       e.stopPropagation();
 
       if (e.touches.length >= 2) {
-        // 双指手势：进入缩放/旋转模式，并保持红色选中框。
         pinchActive = true;
         isDragging = false;
         const a = e.touches[0], b = e.touches[1];
-        pinchStartDistance = Math.max(1, touchDistance(a, b));
-        // 分别记录双指的横向/纵向间距：横向拉开只改变“宽窄”，
-        // 纵向拉开只改变“高矮”，因此可以用双指自由调整部件宽窄比例。
-        pinchStartXDistance = Math.max(1, Math.abs(b.clientX - a.clientX));
-        pinchStartYDistance = Math.max(1, Math.abs(b.clientY - a.clientY));
-        pinchStartAngle = touchAngle(a, b);
+        const axis = touchAxisDistance(a, b);
+        pinchStartXDistance = axis.x;
+        pinchStartYDistance = axis.y;
         pinchStartW = parseFloat(el.style.width) || el.getBoundingClientRect().width;
         pinchStartH = parseFloat(el.style.height) || el.getBoundingClientRect().height;
-        pinchStartRotate = parseFloat(el.dataset.rotate) || 0;
         pinchStartLeft = parseFloat(el.style.left) || 0;
         pinchStartTop = parseFloat(el.style.top) || 0;
         e.preventDefault();
@@ -1455,30 +1451,24 @@ if (index >= 3) {
     el.addEventListener('touchmove', (e) => {
       if (pinchActive && e.touches.length >= 2) {
         const a = e.touches[0], b = e.touches[1];
-        const distance = Math.max(1, touchDistance(a, b));
-        const xDistance = Math.max(1, Math.abs(b.clientX - a.clientX));
-        const yDistance = Math.max(1, Math.abs(b.clientY - a.clientY));
-        // 双指横向移动控制宽度、纵向移动控制高度；保留对角捏合时的整体缩放感。
-        // 这样不再是固定等比缩放，可以真正把“山”拉窄/拉宽、“水”压扁/拉高。
-        let widthScale = xDistance / pinchStartXDistance;
-        let heightScale = yDistance / pinchStartYDistance;
-        if (pinchStartXDistance < 12) widthScale = distance / pinchStartDistance;
-        if (pinchStartYDistance < 12) heightScale = distance / pinchStartDistance;
-        widthScale = Math.max(0.45, Math.min(2.4, widthScale));
-        heightScale = Math.max(0.45, Math.min(2.4, heightScale));
-        const angleDelta = touchAngle(a, b) - pinchStartAngle;
-        const newW = Math.max(34, Math.min(320, pinchStartW * widthScale));
-        const newH = Math.max(34, Math.min(320, pinchStartH * heightScale));
-        const rotate = pinchStartRotate + angleDelta;
+        const axis = touchAxisDistance(a, b);
 
-        // 以双指中心为视觉锚点，尺寸变化时同步修正位置，手感更稳定。
-        const startCenterX = pinchStartLeft + pinchStartW / 2;
-        const startCenterY = pinchStartTop + pinchStartH / 2;
+        // 直接使用两个手指在 X/Y 方向的间距变化：
+        // X 越开，部件越宽；X 越收，部件越窄。
+        // Y 越开，部件越高；Y 越收，部件越矮。
+        // 当手指初始几乎重合时，使用绝对间距变化，避免除以接近 0 的数。
+        const xDelta = axis.x - pinchStartXDistance;
+        const yDelta = axis.y - pinchStartYDistance;
+        const newW = Math.max(24, Math.min(360, pinchStartW + xDelta));
+        const newH = Math.max(24, Math.min(360, pinchStartH + yDelta));
+
+        // 以原部件中心为锚点，调整宽高时不会产生位置漂移。
+        const centerX = pinchStartLeft + pinchStartW / 2;
+        const centerY = pinchStartTop + pinchStartH / 2;
         el.style.width = newW + 'px';
         el.style.height = newH + 'px';
-        el.style.left = (startCenterX - newW / 2) + 'px';
-        el.style.top = (startCenterY - newH / 2) + 'px';
-        el.dataset.rotate = rotate;
+        el.style.left = (centerX - newW / 2) + 'px';
+        el.style.top = (centerY - newH / 2) + 'px';
         applyComponentTransform(el);
         syncTransformPanel(el);
         e.preventDefault();
@@ -1511,6 +1501,7 @@ if (index >= 3) {
       pinchActive = false;
       isDragging = false;
     });
+
   }
 
   // ===== P05 六书构形分析 =====
