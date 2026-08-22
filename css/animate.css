@@ -1,0 +1,218 @@
+/* 字造集 - 动画库 animate.css */
+
+/* 基础动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* 水墨扩散动画 */
+@keyframes inkSpread {
+  0% { transform: scale(0); opacity: 0.8; border-radius: 50%; }
+  50% { opacity: 0.6; }
+  100% { transform: scale(30); opacity: 0; border-radius: 50%; }
+}
+@keyframes inkDrop {
+  0% { transform: scale(0) translateY(-50px); opacity: 0; }
+  30% { transform: scale(1) translateY(0); opacity: 1; }
+  100% { transform: scale(30); opacity: 0; }
+}
+@keyframes inkDiffuse {
+  0% { transform: scale(0.1); opacity: 0.9; filter: blur(0px); }
+  100% { transform: scale(25); opacity: 0; filter: blur(20px); }
+}
+
+/* 墨迹晕染 */
+@keyframes inkBleed {
+  0% { clip-path: circle(0% at 50% 50%); }
+  100% { clip-path: circle(150% at 50% 50%); }
+}
+
+/* 呼吸动画 */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.03); opacity: 0.9; }
+}
+
+/* 浮动动画 */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes spinReverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* 缩放动画 */
+@keyframes scaleIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes scaleOut {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.5); opacity: 0; }
+}
+
+/* 抖动动画 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* 盖章动画 */
+@keyframes stampDown {
+  0% { transform: scale(2) rotate(-15deg); opacity: 0; }
+  50% { transform: scale(0.9) rotate(-5deg); opacity: 1; }
+  70% { transform: scale(1.05) rotate(-3deg); }
+  100% { transform: scale(1) rotate(-3deg); opacity: 1; }
+}
+
+/* 笔画书写动画 */
+@keyframes strokeDraw {
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 墨点滴落 */
+@keyframes drip {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(100px) scale(0.5); opacity: 0; }
+}
+
+/* 粒子上升 */
+@keyframes particleRise {
+  0% { transform: translateY(0) scale(1); opacity: 0.8; }
+  100% { transform: translateY(-100px) scale(0); opacity: 0; }
+}
+
+/* 脉冲 */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.7; }
+}
+
+/* 滑动进入 */
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* 六书环旋转 */
+@keyframes liushuRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 文字逐字显现 */
+@keyframes charReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 墨迹描边 */
+@keyframes inkStroke {
+  0% { stroke-dashoffset: 200; opacity: 0; }
+  50% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* 光晕 */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(180, 50, 50, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(180, 50, 50, 0.6); }
+}
+
+/* 页面切换 */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pageLeave {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-50px); }
+}
+
+/* 工具类 */
+.animate-fadeIn { animation: fadeIn 0.6s ease forwards; }
+.animate-fadeOut { animation: fadeOut 0.6s ease forwards; }
+.animate-fadeInUp { animation: fadeInUp 0.6s ease forwards; }
+.animate-fadeInDown { animation: fadeInDown 0.6s ease forwards; }
+.animate-fadeInLeft { animation: fadeInLeft 0.6s ease forwards; }
+.animate-fadeInRight { animation: fadeInRight 0.6s ease forwards; }
+.animate-scaleIn { animation: scaleIn 0.5s ease forwards; }
+.animate-scaleOut { animation: scaleOut 0.5s ease forwards; }
+.animate-shake { animation: shake 0.5s ease; }
+.animate-breathe { animation: breathe 3s ease-in-out infinite; }
+.animate-float { animation: float 4s ease-in-out infinite; }
+.animate-spin-slow { animation: spinSlow 20s linear infinite; }
+.animate-stamp { animation: stampDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.animate-pulse { animation: pulse 2s ease-in-out infinite; }
+.animate-slideUp { animation: slideUp 0.5s ease forwards; }
+.animate-slideDown { animation: slideDown 0.5s ease forwards; }
+.animate-glow { animation: glow 2s ease-in-out infinite; }
+
+/* 延迟类 */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-800 { animation-delay: 0.8s; }
+.delay-1000 { animation-delay: 1s; }
+
+/* 初始隐藏 */
+.animate-init-hidden { opacity: 0; }
+
+/* 水墨过渡层 */
+.ink-transition {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, #1a1a1a 0%, #2a2a2a 40%, transparent 70%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  z-index: 9999;
+}
+.ink-transition.active {
+  animation: inkSpread 1.2s ease-in-out forwards;
+}

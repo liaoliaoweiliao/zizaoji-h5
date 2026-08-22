@@ -1,0 +1,155 @@
+{
+  "version": "1.0",
+  "description": "字造集汉字构件库",
+  "categories": {
+    "nature": "自然",
+    "body": "身体",
+    "thing": "事物"
+  },
+  "components": [
+    {
+      "id": "sun",
+      "name": "日",
+      "meaning": "太阳、光明、时间",
+      "category": "nature",
+      "semanticTags": ["光明", "时间", "温暖", "阳"],
+      "variants": ["normal", "left", "top"],
+      "strokeCount": 4
+    },
+    {
+      "id": "moon",
+      "name": "月",
+      "meaning": "月亮、思念、夜晚",
+      "category": "nature",
+      "semanticTags": ["思念", "夜晚", "阴", "圆满"],
+      "variants": ["normal", "left", "top"],
+      "strokeCount": 4
+    },
+    {
+      "id": "mountain",
+      "name": "山",
+      "meaning": "山岳、稳重、高远",
+      "category": "nature",
+      "semanticTags": ["稳重", "高远", "静止", "依靠"],
+      "variants": ["normal", "bottom"],
+      "strokeCount": 3
+    },
+    {
+      "id": "water",
+      "name": "水",
+      "meaning": "水流、柔和、生命",
+      "category": "nature",
+      "semanticTags": ["流动", "柔和", "生命", "智慧"],
+      "variants": ["normal", "left", "bottom"],
+      "strokeCount": 4
+    },
+    {
+      "id": "fire",
+      "name": "火",
+      "meaning": "火焰、热情、毁灭",
+      "category": "nature",
+      "semanticTags": ["热情", "力量", "毁灭", "温暖"],
+      "variants": ["normal", "left", "bottom"],
+      "strokeCount": 4
+    },
+    {
+      "id": "tree",
+      "name": "木",
+      "meaning": "树木、生长、生机",
+      "category": "nature",
+      "semanticTags": ["生长", "生机", "坚韧", "自然"],
+      "variants": ["normal", "left", "top", "bottom"],
+      "strokeCount": 4
+    },
+    {
+      "id": "person",
+      "name": "人",
+      "meaning": "人类、行为、社会",
+      "category": "body",
+      "semanticTags": ["人", "行为", "社会", "个体"],
+      "variants": ["normal", "left"],
+      "strokeCount": 2
+    },
+    {
+      "id": "heart",
+      "name": "心",
+      "meaning": "心脏、情感、思想",
+      "category": "body",
+      "semanticTags": ["情感", "内心", "思念", "愿望"],
+      "variants": ["normal", "left", "bottom", "inside"],
+      "strokeCount": 4
+    },
+    {
+      "id": "eye",
+      "name": "目",
+      "meaning": "眼睛、视觉、关注",
+      "category": "body",
+      "semanticTags": ["视觉", "关注", "洞察", "看见"],
+      "variants": ["normal", "left", "top"],
+      "strokeCount": 5
+    },
+    {
+      "id": "mouth",
+      "name": "口",
+      "meaning": "嘴巴、言语、入口",
+      "category": "body",
+      "semanticTags": ["言语", "入口", "表达", "呼吸"],
+      "variants": ["normal", "left", "top", "inside"],
+      "strokeCount": 3
+    },
+    {
+      "id": "hand",
+      "name": "手",
+      "meaning": "手掌、动作、把握",
+      "category": "body",
+      "semanticTags": ["动作", "把握", "创造", "帮助"],
+      "variants": ["normal", "left", "top"],
+      "strokeCount": 4
+    },
+    {
+      "id": "door",
+      "name": "门",
+      "meaning": "门户、通道、界限",
+      "category": "thing",
+      "semanticTags": ["通道", "界限", "开启", "家"],
+      "variants": ["normal", "top", "enclosing"],
+      "strokeCount": 3
+    },
+    {
+      "id": "stone",
+      "name": "石",
+      "meaning": "石头、坚硬、永恒",
+      "category": "thing",
+      "semanticTags": ["坚硬", "永恒", "沉重", "稳固"],
+      "variants": ["normal", "left", "bottom"],
+      "strokeCount": 5
+    },
+    {
+      "id": "earth",
+      "name": "土",
+      "meaning": "土地、根基、孕育",
+      "category": "thing",
+      "semanticTags": ["根基", "孕育", "大地", "归属"],
+      "variants": ["normal", "left", "bottom"],
+      "strokeCount": 3
+    },
+    {
+      "id": "clothes",
+      "name": "衣",
+      "meaning": "衣服、外表、保护",
+      "category": "thing",
+      "semanticTags": ["外表", "保护", "装饰", "身份"],
+      "variants": ["normal", "top", "enclosing"],
+      "strokeCount": 6
+    },
+    {
+      "id": "vehicle",
+      "name": "车",
+      "meaning": "车辆、远行、速度",
+      "category": "thing",
+      "semanticTags": ["远行", "速度", "运输", "变迁"],
+      "variants": ["normal", "left", "top"],
+      "strokeCount": 4
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280" width="200" height="280">
+  <!-- 古风毛笔风格问号 -->
+  <g fill="none" stroke="#302d27" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 问号上半部分曲线 -->
+    <path d="M 60 80 Q 100 30 140 70 Q 170 100 130 130 Q 110 145 100 160" />
+    <!-- 问号点 -->
+    <circle cx="100" cy="210" r="12" fill="#302d27" stroke="none" />
+  </g>
+</svg>

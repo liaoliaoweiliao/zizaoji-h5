@@ -1,0 +1,21 @@
+/* 字造集：内置字体，避免手机预览因系统字体不同造成字形/排版跳变。 */
+@font-face {
+  font-family: "Zizaoji-Serif";
+  src: url("zizaoji-serif.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+@font-face {
+  font-family: "Zizaoji-Sans";
+  src: url("zizaoji-sans.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+
+:root {
+  --font-ancient: "Zizaoji-Serif", serif;
+  --font-modern: "Zizaoji-Sans", sans-serif;
+  --font-minimal: "Zizaoji-Sans", "Helvetica Neue", Arial, sans-serif;
+}

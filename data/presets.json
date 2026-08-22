@@ -1,0 +1,230 @@
+{
+  "version": "1.0",
+  "structures": {
+    "left_right": {
+      "name": "左右结构",
+      "types": [
+        {
+          "id": "lr_standard",
+          "name": "标准左右",
+          "leftRatio": 0.5,
+          "rightRatio": 0.5,
+          "gap": 0.02
+        },
+        {
+          "id": "lr_narrow_wide",
+          "name": "左窄右宽",
+          "leftRatio": 0.38,
+          "rightRatio": 0.62,
+          "gap": 0.02
+        },
+        {
+          "id": "lr_wide_narrow",
+          "name": "左宽右窄",
+          "leftRatio": 0.62,
+          "rightRatio": 0.38,
+          "gap": 0.02
+        }
+      ]
+    },
+    "top_bottom": {
+      "name": "上下结构",
+      "types": [
+        {
+          "id": "tb_balanced",
+          "name": "上下均衡",
+          "topRatio": 0.5,
+          "bottomRatio": 0.5,
+          "gap": 0.02
+        },
+        {
+          "id": "tb_narrow_wide",
+          "name": "上窄下宽",
+          "topRatio": 0.38,
+          "bottomRatio": 0.62,
+          "gap": 0.02
+        },
+        {
+          "id": "tb_wide_narrow",
+          "name": "上宽下窄",
+          "topRatio": 0.62,
+          "bottomRatio": 0.38,
+          "gap": 0.02
+        }
+      ]
+    },
+    "enclosing": {
+      "name": "包围结构",
+      "types": [
+        {
+          "id": "en_full",
+          "name": "全包围",
+          "innerScale": 0.6,
+          "innerOffset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "id": "en_top",
+          "name": "上包围",
+          "innerScale": 0.65,
+          "innerOffset": {
+            "x": 0,
+            "y": 0.1
+          }
+        },
+        {
+          "id": "en_side",
+          "name": "侧包围",
+          "innerScale": 0.65,
+          "innerOffset": {
+            "x": 0.1,
+            "y": 0
+          }
+        }
+      ]
+    }
+  },
+  "interpretationStyles": {
+    "classical": {
+      "name": "古风雅致",
+      "description": "类似古文字训诂的文学表达",
+      "template": "从{comp1}从{comp2}，{meaning}之意。",
+      "visual": {
+        "font": "ancient",
+        "color": "#2c2c2c",
+        "layout": "vertical"
+      }
+    },
+    "modern": {
+      "name": "当代扎心",
+      "description": "社交媒体感的当代表达",
+      "template": "{userMeaning}",
+      "visual": {
+        "font": "modern",
+        "color": "#1a1a1a",
+        "layout": "horizontal"
+      }
+    },
+    "minimal": {
+      "name": "极简哲学",
+      "description": "极简高级的哲学表达",
+      "template": "{comp1} · {comp2} · {keyword}\n{philosophy}",
+      "visual": {
+        "font": "minimal",
+        "color": "#333333",
+        "layout": "centered"
+      }
+    }
+  },
+  "personalities": [
+    {
+      "id": "huiyi_mage",
+      "name": "会意魔法师",
+      "description": "擅长把两个已有意义组合起来",
+      "match": {
+        "structure": [
+          "left_right",
+          "top_bottom"
+        ],
+        "minComponents": 2
+      }
+    },
+    {
+      "id": "xiangxing_observer",
+      "name": "象形观察家",
+      "description": "擅长从现实世界寻找造字灵感",
+      "match": {
+        "category": [
+          "nature"
+        ],
+        "singleComponent": true
+      }
+    },
+    {
+      "id": "structure_designer",
+      "name": "构形设计师",
+      "description": "对字形比例和结构特别敏感",
+      "match": {
+        "usesCustomLayout": true
+      }
+    },
+    {
+      "id": "emotion_crafter",
+      "name": "情绪造字师",
+      "description": "擅长把难以描述的情绪变成文字",
+      "match": {
+        "hasHeart": true,
+        "style": "modern"
+      }
+    }
+  ],
+  "posterBackgrounds": [
+    {
+      "id": "xuanzhi",
+      "name": "宣纸",
+      "color": "#f5f0e6",
+      "pattern": "paper"
+    },
+    {
+      "id": "shanshui",
+      "name": "山水",
+      "color": "#e8e4dc",
+      "pattern": "mountain"
+    },
+    {
+      "id": "yunwen",
+      "name": "云纹",
+      "color": "#f0ebe0",
+      "pattern": "cloud"
+    },
+    {
+      "id": "zhuying",
+      "name": "竹影",
+      "color": "#ede8dd",
+      "pattern": "bamboo"
+    },
+    {
+      "id": "yinzhang",
+      "name": "印章",
+      "color": "#f2ede3",
+      "pattern": "seal"
+    },
+    {
+      "id": "moji",
+      "name": "墨迹",
+      "color": "#eae5da",
+      "pattern": "ink"
+    }
+  ],
+  "loadingFacts": [
+    "「公」，上面不是八，是分开的器物。",
+    "「县」古意是悬挂，和现在的地名毫无关系。",
+    "「慢」最初专指傲慢，并不代表速度慢。",
+    "「戏」，本义是人与猛兽搏斗。",
+    "「家」字下面的「豕」是猪，古代有猪才算家。",
+    "「安」是女子在屋下，表示安宁。",
+    "「休」是人靠在树上休息。",
+    "「明」是日月同辉，表示光明。",
+    "「愁」是秋天的心，秋日易生愁绪。",
+    "「忍」是心上一把刀，忍耐需要克制。"
+  ],
+  "modernTopics": [
+    "内卷",
+    "躺平",
+    "社恐",
+    "情绪价值",
+    "电子失眠",
+    "信息焦虑",
+    "赛博孤独",
+    "见面困难",
+    "想念",
+    "松弛感",
+    "emo",
+    "佛系",
+    "破防",
+    "凡尔赛",
+    "996"
+  ]
+}
