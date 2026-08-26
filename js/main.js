@@ -112,7 +112,7 @@
       if (!unlocked) { unlock(); return; }
       if (currentBgm && currentBgm.paused && currentBgmKey) {
         currentBgm.volume = dbToVolume(currentBgm._zDb ?? -20);
-        currentBgm.play().catch(() => {});
+        playWithRetry(currentBgm);
       }
     }
     function fadeTo(audio, target, ms, done) {
@@ -127,6 +127,25 @@
       };
       requestAnimationFrame(step);
     }
+    // 带重试的音频播放：play()失败时等待canplay后重试，确保BGM能播出来
+    function playWithRetry(a) {
+      const doPlay = () => {
+        const p = a.play();
+        if (p && p.catch) {
+          p.catch(() => {
+            // 播放失败（通常是音频未加载完成），等待canplay后重试
+            const onReady = () => { a.play().catch(() => {}); };
+            a.addEventListener('canplay', onReady, { once: true });
+            // 兜底：1.5秒后强制重试
+            setTimeout(() => {
+              a.removeEventListener('canplay', onReady);
+              if (a.paused) a.play().catch(() => {});
+            }, 1500);
+          });
+        }
+      };
+      doPlay();
+    }
     function startBgm(key, db, immediate, fadeMs=500) {
       const a = getAudio(key);
       const target = dbToVolume(db);
@@ -140,8 +159,7 @@
       // 相同BGM但被暂停了（手机端常见）：恢复播放
       if (currentBgm === a && a.paused) {
         a.volume = immediate ? target : 0;
-        const p = a.play();
-        if (p && p.catch) p.catch(() => {});
+        playWithRetry(a);
         if (!immediate) fadeTo(a, target, fadeMs);
         return;
       }
@@ -152,11 +170,7 @@
       currentBgm = a;
       currentBgmKey = key;
       a.volume = immediate ? target : 0;
-      const p = a.play();
-      if (p && p.catch) p.catch(() => {
-        // 手机端播放失败时不重置unlocked，等待下次用户交互恢复
-        console.warn('BGM play failed, will retry on next user interaction');
-      });
+      playWithRetry(a);
       if (!immediate) fadeTo(a, target, fadeMs);
     }
     function pageBgm(pageId) {
@@ -164,7 +178,7 @@
       // 手机端保障：页面切换时若BGM被暂停则恢复
       if (unlocked && currentBgm && currentBgm.paused && currentBgmKey) {
         currentBgm.volume = dbToVolume(currentBgm._zDb ?? -20);
-        currentBgm.play().catch(() => {});
+        playWithRetry(currentBgm);
       }
       const key = bgmByPage[pageId];
       // 配置为 null 的页面不播放背景音乐，停止当前BGM
@@ -234,6 +248,10 @@
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; return; }
       startBgm(key, db, false);
     }
+    // 预加载所有BGM文件，避免切换时因未加载导致play()失败
+    ['bgmHome','bgmCollection','bgmMeaning','bgmPoster'].forEach(k => {
+      try { const a = getAudio(k); a.preload = 'auto'; a.load(); } catch(e) {}
+    });
     return { unlock, pageBgm, playSfx, fadeBgmOut, setMeaningStyle, getAudio, setMuted, toggleMuted, isMuted, ensureBgmRunning };
   })();
   window.AudioEngine = AudioEngine;
