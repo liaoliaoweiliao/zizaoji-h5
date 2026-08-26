@@ -1,0 +1,31 @@
+
+#xuanxuan{
+ position:fixed;
+ z-index:9999;
+ width:92px;
+ right:14px;
+ bottom:18px;
+ pointer-events:none;
+}
+#xuanxuan img{
+ width:100%;
+ animation:xuanFloat 3s ease-in-out infinite;
+}
+.xuan-dialog{
+ display:none;
+ position:absolute;
+ right:0;
+ bottom:100px;
+ width:150px;
+ background:#fff8e8;
+ border:1px solid #b58b45;
+ border-radius:14px;
+ padding:8px;
+ font-size:12px;
+ color:#432d1b;
+}
+@media(min-width:768px){
+ #xuanxuan{width:120px;right:30px;bottom:30px;}
+ .xuan-dialog{font-size:14px;width:180px;}
+}
+@keyframes xuanFloat{50%{transform:translateY(-8px)}}

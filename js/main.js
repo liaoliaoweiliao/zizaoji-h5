@@ -16,7 +16,7 @@
 
   // ===== 全局状态 =====
   const AppState = {
-    currentPage: 'loading',
+    currentPage: 'story',
     userName: localStorage.getItem('zizaoji_username') || '',
     collection: JSON.parse(localStorage.getItem('zizaoji_collection') || '[]'),
     labProgress: { xiangxing: false, huiyi: false, zhishi: false },
@@ -67,16 +67,18 @@
       earth: 'element/earth.mp3'
     };
     const bgmVolumes = {
-      home: -12, loading: -12, lab: -19, ability: -20, workshop: -19,
-      analysis: -21, meaning: -19, charcard: -18, certify: -17,
-      poster: -19, collection: -21
+      story: -17, intro: -17,
+      loading: -4, lab: -8, ability: -12, workshop: -5,
+      analysis: -13, meaning: -10, charcard: -10, certify: -10,
+      poster: -10, collection: -13
     };
     const bgmByPage = {
-      loading: 'bgmHome', intro: 'bgmHome', lab: 'bgmCollection',
+      loading: 'bgmHome', story: 'bgmHome', intro: 'bgmHome', lab: 'bgmCollection',
       ability: 'bgmCollection', workshop: 'bgmCollection',
       analysis: 'bgmCollection', meaning: 'bgmMeaning',
-      charcard: 'bgmPoster', certify: 'bgmPoster',
-      poster: 'bgmPoster', collection: 'bgmHome'
+      // 释义页、字卡页、造字人格页、海报页共享 meaning-story，切换不中断
+      charcard: 'bgmMeaning', certify: 'bgmMeaning',
+      poster: 'bgmMeaning', collection: 'bgmHome'
     };
     const audioCache = {};
     let currentBgm = null;
@@ -84,6 +86,8 @@
     let unlocked = false;
     const pending = [];
     const now = () => Date.now();
+    // 全局音效增益：所有交互音效统一提高
+    const sfxBoost = 4;
 
     function dbToVolume(db) { return Math.max(0, Math.min(1, Math.pow(10, db / 20))); }
     function getAudio(key) {
@@ -135,14 +139,20 @@
     }
     function pageBgm(pageId) {
       if (window.__zizaojiMuted) return;
-      if (window.__zizaojiMuted) return;
       const key = bgmByPage[pageId];
+      // 配置为 null 的页面不播放背景音乐，停止当前BGM
+      if (key === null) {
+        fadeBgmOut(400);
+        return;
+      }
       if (!key) return;
       const db = bgmVolumes[pageId] ?? -20;
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; try { currentBgm.currentTime = 0; } catch(e) {} return; }
       startBgm(key, db, false, pageId === 'ability' ? 5000 : 500);
     }
     function playSfx(key, db, maxMs, rate=1, queueIfLocked=true) {
+      // 声音开关关闭时，所有交互音效也不播放
+      if (window.__zizaojiMuted) return;
       if (!unlocked) {
         if (queueIfLocked) pending.push([key, db, maxMs, rate, false]);
         return;
@@ -151,7 +161,7 @@
       try { a.pause(); a.currentTime = 0; } catch(e) {}
       a.loop = false;
       a.playbackRate = rate;
-      a.volume = dbToVolume(db);
+      a.volume = dbToVolume(db + sfxBoost);
       const p = a.play();
       if (p && p.catch) p.catch(() => {});
       if (maxMs) {
@@ -169,6 +179,12 @@
       localStorage.setItem('zizaoji_music_muted', window.__zizaojiMuted ? '1' : '0');
       if (window.__zizaojiMuted) {
         if (currentBgm) fadeTo(currentBgm, 0, 180);
+        // 静音时同时停止所有正在播放的交互音效
+        Object.values(audioCache).forEach(a => {
+          if (a !== currentBgm) {
+            try { a.pause(); a.currentTime = 0; } catch(e) {}
+          }
+        });
       } else if (currentBgmKey) {
         const db = currentBgm?._zDb ?? -20;
         if (!unlocked) {
@@ -225,6 +241,7 @@
   }
 
   function navigateTo(pageId) {
+    if (window.stopStoryVoice && pageId !== 'story') { window.stopStoryVoice(); }
     // 用style.display直接控制，不依赖CSS class
     const allPages = document.querySelectorAll('.page');
     allPages.forEach(p => { p.style.display = 'none'; });
@@ -233,6 +250,18 @@
       page.style.display = 'flex';
       page.scrollTop = 0;
       AppState.currentPage = pageId;
+       if(window.XuanXuan){
+          const xuanMap={
+          story:['story','你好，我是玄玄。'],
+          intro:['intro','让我们开始创造一个字。'],
+          lab:['lab','每一种心情都等待一个名字。'],
+          workshop:['workshop','你的此刻，会诞生怎样的文字呢？'],
+          analysis:['analysis','让我记录这个字的故事。'],
+          charcard:['charcard','我把它记下来了。'],
+          collection:['collection','每一个字，都有属于自己的故事哦。']
+          };
+          if(xuanMap[pageId]) XuanXuan.show(...xuanMap[pageId]);
+       }
        AudioEngine.pageBgm(pageId);
       // 触发页面初始化
       try {
@@ -247,9 +276,6 @@
 
   function inkTransition(callback) {
     AudioEngine.playSfx('brush', -10, 900);
-    AudioEngine.fadeBgmOut(450);
-    AudioEngine.playSfx('brush', -10, 900);
-    AudioEngine.fadeBgmOut(450);
     const layer = document.getElementById('ink-transition');
     if (layer) {
       layer.classList.add('active');
@@ -411,6 +437,290 @@
       btn.setAttribute('aria-label', muted ? '开启背景音乐' : '关闭背景音乐');
       btn.title = muted ? '开启背景音乐' : '关闭背景音乐';
     });
+  }
+
+  // ===== 情景页声音按钮 UI =====
+  function updateStorySoundUI(muted = AudioEngine.isMuted()) {
+    const btn = document.getElementById('storySoundBtn');
+    if (!btn) return;
+    btn.classList.toggle('is-muted', muted);
+    btn.setAttribute('aria-pressed', String(!muted));
+    btn.setAttribute('aria-label', muted ? '开启声音' : '关闭声音');
+  }
+
+
+  // ===== P00 情景引入页 =====
+  function initStory() {
+    const btn = document.getElementById('story-start');
+    if (btn && !btn.dataset.ready) {
+      btn.dataset.ready = '1';
+      btn.addEventListener('click', () => {
+        stopStoryVoice();
+        navigateTo('intro');
+      });
+    }
+    const canvas = document.getElementById('storyParticles');
+    if (!canvas || canvas.dataset.ready) return;
+    canvas.dataset.ready='1';
+    const ctx=canvas.getContext('2d');
+    const resize=()=>{canvas.width=innerWidth;canvas.height=innerHeight};
+    resize(); window.addEventListener('resize',resize);
+    let dots=Array.from({length:45},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.5,v:Math.random()*.25+.05}));
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle='rgba(220,200,160,.55)';
+      dots.forEach(d=>{ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,7);ctx.fill();d.y-=d.v;if(d.y<0)d.y=canvas.height});
+      requestAnimationFrame(draw);
+    }
+    draw();
+
+    // ===== 鼠标/手指跟随光晕：黑暗中手持微光 =====
+    const light=document.querySelector('.mouse-light');
+    let mx=innerWidth/2,my=innerHeight/2,lx=mx,ly=my;
+    let lightPulse=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+    document.addEventListener('touchmove',e=>{let t=e.touches[0];if(t){mx=t.clientX;my=t.clientY;}},{passive:true});
+    function moveLight(){
+      lx+=(mx-lx)*.1; ly+=(my-ly)*.1;
+      if(light){
+        const pulseScale=1+lightPulse;
+        light.style.left=lx-130*pulseScale+'px';
+        light.style.top=ly-130*pulseScale+'px';
+        light.style.width=260*pulseScale+'px';
+        light.style.height=260*pulseScale+'px';
+        lightPulse*=.92;
+      }
+      requestAnimationFrame(moveLight);
+    }
+    moveLight();
+
+    // 点击涟漪 + 光晕脉冲
+    function createRipple(x,y){
+      const r=document.createElement('div');
+      r.className='light-ripple';
+      r.style.left=x+'px'; r.style.top=y+'px';
+      document.body.appendChild(r);
+      setTimeout(()=>r.remove(),1100);
+      lightPulse=0.4;
+    }
+    document.addEventListener('click',e=>{
+      if(e.target.closest('#page-story')) createRipple(e.clientX,e.clientY);
+    });
+    document.addEventListener('touchstart',e=>{
+      if(e.target.closest('#page-story')){const t=e.touches[0];if(t)createRipple(t.clientX,t.clientY);}
+    },{passive:true});
+
+    // ===== 打字机效果：正确保留HTML标签，只拆分文本节点 =====
+    const storyPage = document.getElementById('page-story');
+    const lines = storyPage.querySelectorAll('.type-line');
+    // 保存每行原始HTML，便于重复启动时恢复（避免intro-char嵌套）
+    const originalLineHTML = Array.from(lines).map(el => el.innerHTML);
+    const charInterval = 85; // 每字间隔ms
+    // 每行开始时间（与旁白同步的时间轴，可按需微调）
+    const lineStartTimes = [0, 2200, 5000, 7200, 10200, 14200, 18200];
+    let storyTimers = [];
+    let storyStarted = false;
+    let voiceAudio = null;
+
+    function clearStoryTimers(){ storyTimers.forEach(t=>clearTimeout(t)); storyTimers=[]; }
+
+    function resetStoryLines(){
+      lines.forEach((el, i) => { el.innerHTML = originalLineHTML[i]; });
+    }
+
+    function typeWriteLine(el, startTime){
+      // 先重置
+      el.classList.remove('visible');
+      // 使用TreeWalker只遍历文本节点，保留HTML标签结构
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      const textNodes = [];
+      let node;
+      while (node = walker.nextNode()) {
+        if (node.textContent.length > 0) textNodes.push(node);
+      }
+      let totalChars = 0;
+      textNodes.forEach(textNode => {
+        const text = textNode.textContent;
+        const parent = textNode.parentNode;
+        const fragment = document.createDocumentFragment();
+        for (let ch of text) {
+          if (ch === ' ' || ch === '\n' || ch === '\t' || ch === '·') {
+            fragment.appendChild(document.createTextNode(ch));
+          } else {
+            const span = document.createElement('span');
+            span.className = 'intro-char';
+            span.textContent = ch;
+            fragment.appendChild(span);
+            totalChars++;
+          }
+        }
+        parent.replaceChild(fragment, textNode);
+      });
+      // 行容器淡入
+      const t1 = setTimeout(()=>el.classList.add('visible'), Math.max(0, startTime - 100));
+      storyTimers.push(t1);
+      // 逐字显示
+      const chars = el.querySelectorAll('.intro-char');
+      chars.forEach((c, i) => {
+        const t = setTimeout(()=>c.classList.add('visible'), startTime + i * charInterval);
+        storyTimers.push(t);
+      });
+      return startTime + totalChars * charInterval;
+    }
+
+    function startStoryAnimation(){
+      if(storyStarted) return;
+      storyStarted = true;
+      clearStoryTimers();
+      // 恢复原始HTML后再拆分，避免重复启动时intro-char嵌套
+      resetStoryLines();
+      // 旁白不再随情景页自动播放，只由“听听隐藏的故事”入口触发。
+      // 重置所有行
+      lines.forEach(el=>{
+        el.classList.remove('visible');
+        el.querySelectorAll('.intro-char').forEach(c=>c.classList.remove('visible'));
+      });
+      btn.classList.remove('visible');
+      // 逐行打字
+      let lastEnd = 0;
+      lines.forEach((line, i) => {
+        const end = typeWriteLine(line, lineStartTimes[i] || (i * 1500));
+        lastEnd = Math.max(lastEnd, end);
+      });
+      // 按钮最后出现
+      const btnTimer = setTimeout(()=>btn.classList.add('visible'), lastEnd + 1000);
+      storyTimers.push(btnTimer);
+    }
+
+    // ===== 隐藏旁白：仅由入口触发，且只播放一次 =====
+    function initVoice(){
+      if(voiceAudio) return voiceAudio;
+      voiceAudio = new Audio('assets/voice.mp3');
+      voiceAudio.loop = false;
+      voiceAudio.volume = 0.85;
+      voiceAudio.preload = 'auto';
+      return voiceAudio;
+    }
+
+    function updateHiddenVoiceUI(state){
+      const btn = document.getElementById('hiddenVoiceBtn');
+      if(!btn) return;
+      const label = btn.querySelector('.hidden-voice-label');
+      if(state === 'playing'){
+        if(label) label.textContent = '正在聆听...';
+        btn.classList.add('is-playing');
+        btn.disabled = true;
+        btn.setAttribute('aria-label', '正在聆听...');
+      }else if(state === 'done'){
+        if(label) label.textContent = '已聆听';
+        btn.classList.remove('is-playing');
+        btn.disabled = true;
+        btn.setAttribute('aria-label', '已聆听');
+      }else{
+        if(label) label.textContent = '听听隐藏的故事';
+        btn.classList.remove('is-playing');
+        btn.disabled = false;
+        btn.setAttribute('aria-label', '听听隐藏的故事');
+      }
+    }
+
+    async function playHiddenVoice(){
+      if(!voiceAudio || voiceAudio.dataset.played === '1') return;
+      const v = voiceAudio;
+      v.dataset.played = '1';
+      v.currentTime = 0;
+      v.muted = false;
+      v.volume = 0.85;
+
+      // 从时间轴起点重新同步文案与旁白。
+      storyStarted = false;
+      clearStoryTimers();
+      startStoryAnimation();
+
+      updateHiddenVoiceUI('playing');
+      v.onended = () => updateHiddenVoiceUI('done');
+      v.onerror = () => {
+        delete v.dataset.played;
+        updateHiddenVoiceUI('ready');
+      };
+      try{
+        await v.play();
+      }catch(e){
+        delete v.dataset.played;
+        updateHiddenVoiceUI('ready');
+        console.warn('隐藏旁白播放失败:', e);
+      }
+    }
+
+    function stopStoryVoice(){
+      if(voiceAudio){
+        try{ voiceAudio.pause(); voiceAudio.currentTime=0; }catch(e){}
+      }
+    }
+    window.stopStoryVoice = stopStoryVoice;
+
+    function setStorySoundMuted(muted){
+      AudioEngine.setMuted(muted);
+      updateStorySoundUI(muted);
+      updateMusicSwitchUI(muted);
+      // 声音按钮只能关闭旁白，不能打开旁白（旁白仅由"听听隐藏的故事"触发）
+      if (muted) stopStoryVoice();
+    }
+
+    // 情景页进入只启动背景音乐，文案与旁白由"听听隐藏的故事"按钮同步触发。
+    function onStoryEnter(){
+      AudioEngine.unlock();
+      AudioEngine.pageBgm('story');
+    }
+
+    // 预加载旁白，但不自动播放。
+    initVoice();
+    const storySkipBtn=document.getElementById('storySkipBtn');
+    if(storySkipBtn && !storySkipBtn.dataset.ready){
+      storySkipBtn.dataset.ready='1';
+      storySkipBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        stopStoryVoice();
+        clearStoryTimers();
+        navigateTo('intro');
+      });
+    }
+
+    const storySoundBtn=document.getElementById('storySoundBtn');
+    if(storySoundBtn && !storySoundBtn.dataset.ready){
+      storySoundBtn.dataset.ready='1';
+      storySoundBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        const muted=!AudioEngine.isMuted();
+        setStorySoundMuted(muted);
+      });
+    }
+
+    const hiddenVoiceBtn=document.getElementById('hiddenVoiceBtn');
+    if(hiddenVoiceBtn && !hiddenVoiceBtn.dataset.ready){
+      hiddenVoiceBtn.dataset.ready='1';
+      hiddenVoiceBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        playHiddenVoice();
+      });
+    }
+    updateHiddenVoiceUI('ready');
+    updateStorySoundUI(
+AudioEngine.isMuted());
+    // 预先拆分文案为逐字span并保持隐藏，等待点击按钮后与旁白同步显示
+    startStoryAnimation();
+    clearStoryTimers();
+    lines.forEach(el=>{
+      el.classList.remove('visible');
+      el.querySelectorAll('.intro-char').forEach(c=>c.classList.remove('visible'));
+    });
+    btn.classList.remove('visible');
+    storyStarted = false;
+    // 页面进入后自动开始（旁白只属于情景页）
+    const autoTimer = setTimeout(()=>{
+      if(!storyStarted) onStoryEnter();
+    }, 50);
+    storyTimers.push(autoTimer);
   }
 
   // ===== P01 开场页 =====
@@ -983,7 +1293,7 @@ if (index >= 3) {
     el.style.display = 'flex';
     el.style.alignItems = 'center';
     el.style.justifyContent = 'center';
-    el.style.fontFamily = 'var(--font-ancient)';
+    el.style.fontFamily = 'var(--font-banshu)';
     el.style.fontSize = Math.min(w, h) * 0.7 + 'px';
     el.textContent = comp.name;
     el.dataset.id = comp.id;
@@ -1402,21 +1712,19 @@ if (index >= 3) {
       isRotating = false;
     });
 
-    // 手机触摸：单指拖动；双指捏住时独立调整宽度和高度。
-    // 规则：双指左右横向拉开/收拢 => 宽度；上下竖向拉开/收拢 => 高度。
-    // 不改变位置、不改变旋转，允许自由组合出任意宽窄比例。
+    // 手机触摸：单指拖动；双指捏住旋转选中构件（附带等比缩放）。
+    // 双指角度变化 => 旋转；双指距离变化 => 等比缩放。
     let pinchActive = false;
-    let pinchStartXDistance = 0;
-    let pinchStartYDistance = 0;
+    let pinchStartAngle = 0;
+    let pinchStartDistance = 0;
+    let pinchStartRotate = 0;
     let pinchStartW = 0;
     let pinchStartH = 0;
     let pinchStartLeft = 0;
     let pinchStartTop = 0;
 
-    const touchAxisDistance = (a, b) => ({
-      x: Math.abs(b.clientX - a.clientX),
-      y: Math.abs(b.clientY - a.clientY)
-    });
+    const touchAngle = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+    const touchDistance = (a, b) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
 
     el.addEventListener('touchstart', (e) => {
       document.querySelectorAll('.canvas-component.selected').forEach(s => s.classList.remove('selected'));
@@ -1428,9 +1736,9 @@ if (index >= 3) {
         pinchActive = true;
         isDragging = false;
         const a = e.touches[0], b = e.touches[1];
-        const axis = touchAxisDistance(a, b);
-        pinchStartXDistance = axis.x;
-        pinchStartYDistance = axis.y;
+        pinchStartAngle = touchAngle(a, b);
+        pinchStartDistance = touchDistance(a, b);
+        pinchStartRotate = parseFloat(el.dataset.rotate) || 0;
         pinchStartW = parseFloat(el.style.width) || el.getBoundingClientRect().width;
         pinchStartH = parseFloat(el.style.height) || el.getBoundingClientRect().height;
         pinchStartLeft = parseFloat(el.style.left) || 0;
@@ -1451,24 +1759,28 @@ if (index >= 3) {
     el.addEventListener('touchmove', (e) => {
       if (pinchActive && e.touches.length >= 2) {
         const a = e.touches[0], b = e.touches[1];
-        const axis = touchAxisDistance(a, b);
+        const currentAngle = touchAngle(a, b);
+        const currentDistance = touchDistance(a, b);
 
-        // 直接使用两个手指在 X/Y 方向的间距变化：
-        // X 越开，部件越宽；X 越收，部件越窄。
-        // Y 越开，部件越高；Y 越收，部件越矮。
-        // 当手指初始几乎重合时，使用绝对间距变化，避免除以接近 0 的数。
-        const xDelta = axis.x - pinchStartXDistance;
-        const yDelta = axis.y - pinchStartYDistance;
-        const newW = Math.max(24, Math.min(360, pinchStartW + xDelta));
-        const newH = Math.max(24, Math.min(360, pinchStartH + yDelta));
+        // 双指旋转：角度差直接应用到构件旋转
+        const angleDelta = currentAngle - pinchStartAngle;
+        const newRotate = pinchStartRotate + angleDelta;
+        el.dataset.rotate = newRotate;
 
-        // 以原部件中心为锚点，调整宽高时不会产生位置漂移。
-        const centerX = pinchStartLeft + pinchStartW / 2;
-        const centerY = pinchStartTop + pinchStartH / 2;
-        el.style.width = newW + 'px';
-        el.style.height = newH + 'px';
-        el.style.left = (centerX - newW / 2) + 'px';
-        el.style.top = (centerY - newH / 2) + 'px';
+        // 双指等比缩放：距离比作为缩放因子
+        if (pinchStartDistance > 0) {
+          const scale = Math.max(0.3, Math.min(2.5, currentDistance / pinchStartDistance));
+          const newW = Math.max(24, Math.min(360, pinchStartW * scale));
+          const newH = Math.max(24, Math.min(360, pinchStartH * scale));
+          // 以原构件中心为锚点，缩放时不漂移
+          const centerX = pinchStartLeft + pinchStartW / 2;
+          const centerY = pinchStartTop + pinchStartH / 2;
+          el.style.width = newW + 'px';
+          el.style.height = newH + 'px';
+          el.style.left = (centerX - newW / 2) + 'px';
+          el.style.top = (centerY - newH / 2) + 'px';
+        }
+
         applyComponentTransform(el);
         syncTransformPanel(el);
         e.preventDefault();
@@ -1616,7 +1928,6 @@ if (index >= 3) {
         } else {
           AppState.currentChar.style = styleId;
            AudioEngine.playSfx('chime', -15, 300, styleId === 'modern' ? 1.12 : (styleId === 'minimal' ? 0.90 : 1.0));
-           AudioEngine.setMeaningStyle(styleId);
           showMeaningModal(styleId);
         }
         renderStyleCards();
@@ -2150,14 +2461,14 @@ if (index >= 3) {
     await loadData();
 
     // 初始化各模块（每个都独立try-catch，防止一个失败影响全部）
-    const initFns = [initIntro, initNameInput, initAbility, initWorkshop, initMeaning, initCharCard, initCertify, initPoster, initCollection, initTopBar];
+    const initFns = [initStory, initIntro, initNameInput, initAbility, initWorkshop, initMeaning, initCharCard, initCertify, initPoster, initCollection, initTopBar];
     initFns.forEach(fn => {
       try { fn(); } catch(e) { console.error('初始化失败:', fn.name, e); }
     });
 
     // 从加载页开始
     try {
-      navigateTo('loading');
+      navigateTo('story');
     } catch(e) {
       console.error('导航失败:', e);
       // 兜底：直接显示intro页
