@@ -1,31 +1,79 @@
 
 #xuanxuan{
- position:fixed;
+ position:absolute;
  z-index:9999;
- width:92px;
- right:14px;
- bottom:18px;
+ width:88px;
  pointer-events:none;
 }
+
 #xuanxuan img{
  width:100%;
- animation:xuanFloat 3s ease-in-out infinite;
+ display:block;
 }
+
 .xuan-dialog{
- display:none;
  position:absolute;
- right:0;
- bottom:100px;
- width:150px;
+ top:105%;
+ left:50%;
+ transform:translateX(-50%);
+ width:max-content;
+ max-width:180px;
  background:#fff8e8;
- border:1px solid #b58b45;
- border-radius:14px;
- padding:8px;
+ border-radius:16px;
+ padding:8px 12px;
  font-size:12px;
- color:#432d1b;
+ line-height:1.4;
 }
-@media(min-width:768px){
- #xuanxuan{width:120px;right:30px;bottom:30px;}
- .xuan-dialog{font-size:14px;width:180px;}
+
+/* 首页、情景页：右下角 */
+.xuan-story,.xuan-intro{
+ position:fixed;
+ right:16px;
+ bottom:24px;
 }
-@keyframes xuanFloat{50%{transform:translateY(-8px)}}
+
+/* 六书实验室：文案右下 */
+.xuan-lab{
+ position:absolute;
+ right:12%;
+ top:190px;
+}
+
+/* 造字工坊：画布右上角 */
+.xuan-workshop{
+ position:absolute;
+ right:30px;
+ top:90px;
+}
+
+/* 释义页：新造字右侧 */
+.xuan-analysis{
+ position:absolute;
+ left:calc(50% + 120px);
+ top:45%;
+}
+
+/* 字卡页 */
+.xuan-charcard{
+ position:absolute;
+ right:30px;
+ bottom:80px;
+}
+
+/* 字造集 */
+.xuan-collection{
+ position:absolute;
+ right:20px;
+ bottom:30px;
+}
+
+@media(max-width:768px){
+ #xuanxuan{width:64px}
+ .xuan-story,.xuan-intro{right:12px;bottom:18px}
+ .xuan-lab{right:8%;top:160px}
+ .xuan-workshop{right:12px;top:80px}
+ .xuan-analysis{left:auto;right:12px;top:42%}
+ .xuan-charcard{right:12px;bottom:60px}
+ .xuan-collection{right:10px;bottom:20px}
+ .xuan-dialog{max-width:140px;font-size:11px}
+}

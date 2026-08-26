@@ -67,10 +67,10 @@
       earth: 'element/earth.mp3'
     };
     const bgmVolumes = {
-      story: -17, intro: -17,
-      loading: -4, lab: -8, ability: -12, workshop: -5,
-      analysis: -13, meaning: -10, charcard: -10, certify: -10,
-      poster: -10, collection: -13
+      story: -10, intro: -10,
+      loading: -2, lab: -4, ability: -8, workshop: -2,
+      analysis: -6, meaning: -5, charcard: -5, certify: -5,
+      poster: -5, collection: -6
     };
     const bgmByPage = {
       loading: 'bgmHome', story: 'bgmHome', intro: 'bgmHome', lab: 'bgmCollection',
@@ -87,7 +87,7 @@
     const pending = [];
     const now = () => Date.now();
     // 全局音效增益：所有交互音效统一提高
-    const sfxBoost = 4;
+    const sfxBoost = 8;
 
     function dbToVolume(db) { return Math.max(0, Math.min(1, Math.pow(10, db / 20))); }
     function getAudio(key) {
