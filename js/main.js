@@ -260,13 +260,7 @@
           charcard:['charcard','我把它记下来了。'],
           collection:['collection','每一个字，都有属于自己的故事哦。']
           };
-          if(xuanMap[pageId]){
-            XuanXuan.show(...xuanMap[pageId]);
-          }else{
-            // 不在映射内的页面（造字人格、海报、释义、能力值、加载等）隐藏玄玄，避免残留遮挡画面
-            const xuanEl=document.getElementById('xuanxuan');
-            if(xuanEl) xuanEl.style.display='none';
-          }
+          if(xuanMap[pageId]) XuanXuan.show(...xuanMap[pageId]);
        }
        AudioEngine.pageBgm(pageId);
       // 触发页面初始化
@@ -1214,8 +1208,7 @@ if (index >= 3) {
       return;
     }
 
-    // 至少两个构件才能完成造字（单构件禁止进入下一页）
-    $('#btn-generate').disabled = comps.length < 2;
+    $('#btn-generate').disabled = false;
     canvas.classList.add('free-mode'); // 有构件即可编辑
     canvas.innerHTML = '';
 
@@ -1341,8 +1334,8 @@ if (index >= 3) {
     });
 
     $('#btn-generate').addEventListener('click', async () => {
-      if (AppState.currentChar.components.length < 2) {
-        showToast('请选择两个构件，再完成造字');
+      if (AppState.currentChar.components.length === 0) {
+        showToast('先选择一个构件，让你的字有一个开始');
         return;
       }
       // 保存用户编辑后的布局并导出完整新字图像（html2canvas截图）
