@@ -1980,7 +1980,15 @@ if (index >= 3) {
     const comps = AppState.currentChar.components;
     const charName = comps.length === 1 ? comps[0].name : comps.map(c => c.name).join('');
 
-    $('#modalCharacter').textContent = charName;
+    // 优先显示用户造出的完整新字图像，兜底显示构件名称拼接
+    const modalChar = $('#modalCharacter');
+    const glyph = AppState.createdGlyph || JSON.parse(sessionStorage.getItem('createdGlyph') || 'null');
+    const glyphImage = (glyph && glyph.image) || AppState.currentChar.glyphImage;
+    if (glyphImage) {
+      modalChar.innerHTML = `<img src="${glyphImage}" alt="新造字" style="max-width:160px;max-height:160px;object-fit:contain;display:block;margin:0 auto;">`;
+    } else {
+      modalChar.textContent = charName;
+    }
     $('#modalStyle').textContent = s.name || '';
     $('#modalMeaning').textContent = getStylePreview(styleId);
     $('#meaningOverlay').classList.add('show');
