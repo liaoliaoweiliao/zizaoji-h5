@@ -9,7 +9,7 @@
   <meta name="description" content="如果今天让你造一个汉字，你会怎么造？《字造集》让你从汉字学习者变为共创者。">
   <link rel="stylesheet" href="fonts/fonts.css">
   <link rel="stylesheet" href="css/animate.css">
-  <link rel="stylesheet" href="css/style.css?v=20260825-07">
+  <link rel="stylesheet" href="css/style.css?v=20260825-v35-2">
 </head>
 <body>
 
@@ -28,35 +28,29 @@
   </div>
 
   <!-- P00 情景引入页 -->
-  <div class="page story-page" id="page-story" style="display:none;">
-  <div class="story-sound-control" id="storySoundControl"><button class="sound-btn story-sound-btn" id="storySoundBtn" aria-label="关闭声音"><img src="assets/icons/sound-icon.svg" alt="声音" class="sound-icon-img"></button></div>
-  <button id="storySkipBtn" class="story-skip-btn" >跳过</button>
-    <canvas id="storyParticles"></canvas>
-    <div class="story-glow"></div>
-    <div class="story-content">
-      <button id="hiddenVoiceBtn" class="hidden-voice-btn" type="button" aria-label="听听隐藏的故事">
-        <img src="assets/icons/star.png" alt="" class="hidden-voice-icon">
-        <span class="hidden-voice-label">听听隐藏的故事</span>
-      </button>
-      <p class="story-small type-line" data-line="0">夜晚 · 一盏灯下</p>
-      <p class="story-line type-line" data-line="1">你打开手机，想写下一句话。</p>
-      <p class="story-line type-line" data-line="2">却发现有一种感觉</p>
-      <p class="story-line type-line" data-line="3"><span class="red-em">没</span>有<span class="red-em">任何</span>一<span class="red-em">个字能够准确表达</span>。</p>
-      <h1 class="story-title type-line" data-line="4">“有些情绪，曾经没有名字。”</h1>
-      <p class="story-line type-line" data-line="5">古人面对未知的事物时，创造了汉字。</p>
-      <p class="story-line type-line" data-line="6">今天，也许你可以创造一个属于自己的字。</p>
-      <button id="story-start" class="story-btn">开启造字之旅</button>
-    </div>
-    <div class="mouse-light"></div>
-  </div>
+  <div class="page scene-page" id="page-scene" style="display:flex;">
+    <div class="scene-bg"></div>
+    <div class="scene-moon"></div>
+    <div class="scene-ink scene-ink-1"></div>
+    <div class="scene-ink scene-ink-2"></div>
 
-  <!-- P00 加载页 -->
-  <!-- P00 加载页 -->
-  <div class="page loading-page" id="page-loading" style="display:none;">
-    <div class="loading-word-wrap">
-      <div id="loadingWord" class="loading-word"></div>
-      <div id="loadingMeaning" class="loading-meaning"></div>
+    <div class="scene-start" id="sceneStart">
+      <div class="scene-start-hint">轻触，开启一段字的旅程</div>
+      <div class="scene-start-pulse"></div>
     </div>
+
+    <div class="scene-stage" id="sceneStage">
+      <div class="scene-line" id="sceneLine"></div>
+      <div class="scene-sub" id="sceneSub"></div>
+    </div>
+
+    <div class="scene-progress" id="sceneProgress">
+      <span class="scene-dot active"></span>
+      <span class="scene-dot"></span>
+      <span class="scene-dot"></span>
+    </div>
+
+    <button class="scene-skip" id="sceneSkip">跳过</button>
   </div>
 
   <!-- P01 开场页 -->
@@ -384,11 +378,8 @@
 </div>
 
 <script src="js/html2canvas.min.js"></script>
-<script src="js/poster.embedded-images.js?v=20260825-01"></script>
-<script src="js/poster.generator.js?v=20260825-07"></script>
-<script src="js/main.js?v=20260825-07"></script>
-<link rel="stylesheet" href="js/components/XuanXuan/xuanxuan.css">
-<script src="js/components/XuanXuan/xuanxuan.js"></script>
-<script src="js/create-button-state.js"></script>
+<script src="js/poster.embedded-images.js?v=20260822-1930"></script>
+<script src="js/poster.generator.js?v=20260825-v35-2"></script>
+<script src="js/main.js?v=20260825-v35-2"></script>
 </body>
 </html>

@@ -14,10 +14,10 @@
   font-display: block;
 }
 @font-face {
-  font-family: "Honglei-Banshu";
-  src: url("hongleibanshu.ttf") format("truetype");
+  font-family: "ZhiMangXing";
+  src: url("ZhiMangXing-Regular.ttf") format("truetype");
   font-style: normal;
-  font-weight: normal;
+  font-weight: 100 900;
   font-display: block;
 }
 
@@ -25,5 +25,4 @@
   --font-ancient: "Zizaoji-Serif", serif;
   --font-modern: "Zizaoji-Sans", sans-serif;
   --font-minimal: "Zizaoji-Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-banshu: "Honglei-Banshu", "Zizaoji-Serif", serif;
 }
