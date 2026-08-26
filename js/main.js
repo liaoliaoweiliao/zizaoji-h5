@@ -1208,8 +1208,8 @@ if (index >= 3) {
       return;
     }
 
-    $('#btn-generate').disabled = false;
-    canvas.classList.add('free-mode'); // 有构件即可编辑
+    $('#btn-generate').disabled = AppState.currentChar.components.length < 2;
+    canvas.classList.add('free-mode'); // 至少两个构件后才能完成造字
     canvas.innerHTML = '';
 
     const structure = AppState.currentChar.structure;
@@ -1336,6 +1336,10 @@ if (index >= 3) {
     $('#btn-generate').addEventListener('click', async () => {
       if (AppState.currentChar.components.length === 0) {
         showToast('先选择一个构件，让你的字有一个开始');
+        return;
+      }
+      if (AppState.currentChar.components.length < 2) {
+        showToast('造字需要至少两个构件，请再选择一个构件');
         return;
       }
       // 保存用户编辑后的布局并导出完整新字图像（html2canvas截图）
