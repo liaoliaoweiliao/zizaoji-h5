@@ -16,7 +16,7 @@
 
   // ===== 全局状态 =====
   const AppState = {
-    currentPage: 'scene',
+    currentPage: 'story',
     userName: localStorage.getItem('zizaoji_username') || '',
     collection: JSON.parse(localStorage.getItem('zizaoji_collection') || '[]'),
     labProgress: { xiangxing: false, huiyi: false, zhishi: false },
@@ -67,16 +67,16 @@
       earth: 'element/earth.mp3'
     };
     const bgmVolumes = {
-      // 整体背景音乐音量调高
-      home: -8, scene: -10, intro: -10, lab: -13, ability: -9, workshop: -7,
-      analysis: -15, meaning: -12, charcard: -12, certify: -12,
-      poster: -12, collection: -15
+      story: -10, intro: -10,
+      loading: -2, lab: -4, ability: -8, workshop: -2,
+      analysis: -6, meaning: -5, charcard: -5, certify: -5,
+      poster: -5, collection: -6
     };
     const bgmByPage = {
-      scene: 'bgmHome', intro: 'bgmHome', lab: 'bgmCollection',
+      loading: 'bgmHome', story: 'bgmHome', intro: 'bgmHome', lab: 'bgmCollection',
       ability: 'bgmCollection', workshop: 'bgmCollection',
       analysis: 'bgmCollection', meaning: 'bgmMeaning',
-      // 释义页、字卡页、造字人格页、海报页四页共享 meaning-story，切换不中断
+      // 释义页、字卡页、造字人格页、海报页共享 meaning-story，切换不中断
       charcard: 'bgmMeaning', certify: 'bgmMeaning',
       poster: 'bgmMeaning', collection: 'bgmHome'
     };
@@ -87,7 +87,7 @@
     const pending = [];
     const now = () => Date.now();
     // 全局音效增益：所有交互音效统一提高
-    const sfxBoost = 4;
+    const sfxBoost = 8;
 
     function dbToVolume(db) { return Math.max(0, Math.min(1, Math.pow(10, db / 20))); }
     function getAudio(key) {
@@ -140,6 +140,11 @@
     function pageBgm(pageId) {
       if (window.__zizaojiMuted) return;
       const key = bgmByPage[pageId];
+      // 配置为 null 的页面不播放背景音乐，停止当前BGM
+      if (key === null) {
+        fadeBgmOut(400);
+        return;
+      }
       if (!key) return;
       const db = bgmVolumes[pageId] ?? -20;
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; try { currentBgm.currentTime = 0; } catch(e) {} return; }
@@ -236,6 +241,7 @@
   }
 
   function navigateTo(pageId) {
+    if (window.stopStoryVoice && pageId !== 'story') { window.stopStoryVoice(); }
     // 用style.display直接控制，不依赖CSS class
     const allPages = document.querySelectorAll('.page');
     allPages.forEach(p => { p.style.display = 'none'; });
@@ -244,6 +250,24 @@
       page.style.display = 'flex';
       page.scrollTop = 0;
       AppState.currentPage = pageId;
+       if(window.XuanXuan){
+          const xuanMap={
+          story:['story','你好，我是玄玄。'],
+          intro:['intro','让我们开始创造一个字。'],
+          lab:['lab','每一种心情都等待一个名字。'],
+          workshop:['workshop','你的此刻，会诞生怎样的文字呢？'],
+          analysis:['analysis','让我记录这个字的故事。'],
+          charcard:['charcard','我把它记下来了。'],
+          collection:['collection','每一个字，都有属于自己的故事哦。']
+          };
+          if(xuanMap[pageId]){
+            XuanXuan.show(...xuanMap[pageId]);
+          }else{
+            // 不在映射内的页面（造字人格、海报、释义、能力值、加载等）隐藏玄玄，避免残留遮挡画面
+            const xuanEl=document.getElementById('xuanxuan');
+            if(xuanEl) xuanEl.style.display='none';
+          }
+       }
        AudioEngine.pageBgm(pageId);
       // 触发页面初始化
       try {
@@ -307,168 +331,32 @@
 
   // ===== 页面初始化函数 =====
   const pageInit = {
-    scene() {
-      const page = document.getElementById('page-scene');
-      const startEl = document.getElementById('sceneStart');
-      const stageEl = document.getElementById('sceneStage');
-      const lineEl = document.getElementById('sceneLine');
-      const subEl = document.getElementById('sceneSub');
-      const progressEl = document.getElementById('sceneProgress');
-      const skipBtn = document.getElementById('sceneSkip');
-      const dots = progressEl ? progressEl.querySelectorAll('.scene-dot') : [];
+    loading() {
+      // 六组随机汉字冷知识
+      const loadingWords = [
+        { word: '公', meaning: '"公"上面不是八，是分开的器物。' },
+        { word: '县', meaning: '古意是悬挂，和现在的地名毫无关系。' },
+        { word: '慢', meaning: '最初专指傲慢，并不代表速度慢。' },
+        { word: '戏', meaning: '本义是人与猛兽搏斗。' },
+        { word: '闻', meaning: '如今多指嗅气味，最初专指耳朵听见声音。' },
+        { word: '劝', meaning: '现在多指规劝劝阻，本义是勉励、鼓舞他人。' }
+      ];
+      const randomIndex = Math.floor(Math.random() * loadingWords.length);
+      const currentWord = loadingWords[randomIndex];
+      const wordEl = document.getElementById('loadingWord');
+      const meaningEl = document.getElementById('loadingMeaning');
+      if (wordEl) wordEl.textContent = currentWord.word;
+      if (meaningEl) meaningEl.textContent = currentWord.meaning;
+       AudioEngine.playSfx('chime', -16, 500);
 
-      // 重置状态
-      if (page) {
-        page.classList.remove('phase-1', 'phase-2', 'phase-3');
-      }
-      if (startEl) startEl.classList.remove('hidden');
-      if (stageEl) stageEl.classList.remove('show');
-      if (lineEl) { lineEl.classList.remove('show'); lineEl.textContent = ''; }
-      if (subEl) { subEl.classList.remove('show'); subEl.textContent = ''; }
-      if (progressEl) progressEl.classList.remove('show');
-      if (skipBtn) skipBtn.classList.remove('show');
-      dots.forEach((d, i) => d.classList.toggle('active', i === 0));
-
-      let sceneTimers = [];
-      let sceneFinished = false;
-
-      const clearSceneTimers = () => {
-        sceneTimers.forEach(t => clearTimeout(t));
-        sceneTimers = [];
-      };
-      const addTimer = (fn, ms) => {
-        const id = setTimeout(fn, ms);
-        sceneTimers.push(id);
-        return id;
-      };
-
-      const stopNarration = () => {
-        try {
-          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-        } catch(e) {}
-      };
-
-      const speak = (text, onEnd) => {
-        try {
-          if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
-          const u = new SpeechSynthesisUtterance(text);
-          u.lang = 'zh-CN';
-          u.rate = 0.82;
-          u.pitch = 0.92;
-          u.volume = 1;
-          // 优先选中文语音
-          const voices = window.speechSynthesis.getVoices();
-          const zhVoice = voices.find(v => /zh|Chinese|Mandarin/i.test(v.lang + v.name));
-          if (zhVoice) u.voice = zhVoice;
-          let ended = false;
-          u.onend = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
-          u.onerror = () => { if (!ended) { ended = true; if (onEnd) onEnd(); } };
-          window.speechSynthesis.speak(u);
-          // 兜底：超时后强制结束（防止某些浏览器onend不触发）
-          addTimer(() => { if (!ended) { ended = true; stopNarration(); if (onEnd) onEnd(); } }, 9000);
-        } catch(e) {
-          if (onEnd) onEnd();
+      // 模拟加载，停留后进入
+      setTimeout(() => {
+        if (!AppState.userName) {
+          showNameInput();
+        } else {
+          navigateTo('intro');
         }
-      };
-
-      const goToIntro = () => {
-        if (sceneFinished) return;
-        sceneFinished = true;
-        clearSceneTimers();
-        stopNarration();
-        try {
-          inkTransition(() => {
-            if (!AppState.userName) {
-              showNameInput();
-              // 名字输入后由initNameInput处理进入intro
-            } else {
-              navigateTo('intro');
-            }
-          });
-        } catch(e) {
-          if (!AppState.userName) showNameInput();
-          else navigateTo('intro');
-        }
-      };
-
-      const setPhase = (n) => {
-        if (!page) return;
-        page.classList.remove('phase-1', 'phase-2', 'phase-3');
-        page.classList.add('phase-' + n);
-        dots.forEach((d, i) => d.classList.toggle('active', i === n - 1));
-      };
-
-      const showLine = (text, sub) => {
-        if (lineEl) {
-          lineEl.classList.remove('show');
-          lineEl.textContent = text;
-          // 触发重排后再加show
-          void lineEl.offsetWidth;
-          lineEl.classList.add('show');
-        }
-        if (subEl) {
-          subEl.classList.remove('show');
-          subEl.textContent = sub || '';
-          void subEl.offsetWidth;
-          if (sub) subEl.classList.add('show');
-        }
-      };
-
-      const startScene = () => {
-        if (sceneFinished) return;
-        // 解锁音频
-        try { AudioEngine.unlock(); } catch(e) {}
-        if (startEl) startEl.classList.add('hidden');
-        if (stageEl) stageEl.classList.add('show');
-        if (progressEl) progressEl.classList.add('show');
-        if (skipBtn) skipBtn.classList.add('show');
-
-        // 三段旁白
-        const lines = [
-          { text: '有些时刻，\n你说不清楚。', sub: 'A FEELING BEYOND WORDS', phase: 1, pause: 1800 },
-          { text: '心里翻涌着一种感觉，\n翻遍所有的字，\n都差那么一点。', sub: 'EVERY WORD FALLS SHORT', phase: 2, pause: 2200 },
-          { text: '如果——\n可以为它，造一个字呢？', sub: 'WHAT IF YOU COULD FORGE ONE', phase: 3, pause: 2000 }
-        ];
-
-        let idx = 0;
-        const playNext = () => {
-          if (sceneFinished) return;
-          if (idx >= lines.length) {
-            addTimer(goToIntro, 1200);
-            return;
-          }
-          const item = lines[idx];
-          setPhase(item.phase);
-          // 仅保留画面文字与节奏，不播放旁白
-          addTimer(() => {
-            showLine(item.text, item.sub);
-            addTimer(() => {
-              idx++;
-              playNext();
-            }, item.pause);
-          }, 300);
-        };
-        playNext();
-      };
-
-      // 绑定事件
-      if (startEl) {
-        startEl.addEventListener('click', startScene);
-      }
-      if (skipBtn) {
-        skipBtn.addEventListener('click', goToIntro);
-      }
-
-      // 预加载语音列表（部分浏览器需要）
-      try {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.getVoices();
-          window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-        }
-      } catch(e) {}
-
-      // 自动开始（2秒后），同时保留点击开始
-      addTimer(() => { if (!sceneFinished) startScene(); }, 2000);
+      }, 2800);
     },
 
     intro() {
@@ -555,6 +443,290 @@
       btn.setAttribute('aria-label', muted ? '开启背景音乐' : '关闭背景音乐');
       btn.title = muted ? '开启背景音乐' : '关闭背景音乐';
     });
+  }
+
+  // ===== 情景页声音按钮 UI =====
+  function updateStorySoundUI(muted = AudioEngine.isMuted()) {
+    const btn = document.getElementById('storySoundBtn');
+    if (!btn) return;
+    btn.classList.toggle('is-muted', muted);
+    btn.setAttribute('aria-pressed', String(!muted));
+    btn.setAttribute('aria-label', muted ? '开启声音' : '关闭声音');
+  }
+
+
+  // ===== P00 情景引入页 =====
+  function initStory() {
+    const btn = document.getElementById('story-start');
+    if (btn && !btn.dataset.ready) {
+      btn.dataset.ready = '1';
+      btn.addEventListener('click', () => {
+        stopStoryVoice();
+        navigateTo('intro');
+      });
+    }
+    const canvas = document.getElementById('storyParticles');
+    if (!canvas || canvas.dataset.ready) return;
+    canvas.dataset.ready='1';
+    const ctx=canvas.getContext('2d');
+    const resize=()=>{canvas.width=innerWidth;canvas.height=innerHeight};
+    resize(); window.addEventListener('resize',resize);
+    let dots=Array.from({length:45},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.5,v:Math.random()*.25+.05}));
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle='rgba(220,200,160,.55)';
+      dots.forEach(d=>{ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,7);ctx.fill();d.y-=d.v;if(d.y<0)d.y=canvas.height});
+      requestAnimationFrame(draw);
+    }
+    draw();
+
+    // ===== 鼠标/手指跟随光晕：黑暗中手持微光 =====
+    const light=document.querySelector('.mouse-light');
+    let mx=innerWidth/2,my=innerHeight/2,lx=mx,ly=my;
+    let lightPulse=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+    document.addEventListener('touchmove',e=>{let t=e.touches[0];if(t){mx=t.clientX;my=t.clientY;}},{passive:true});
+    function moveLight(){
+      lx+=(mx-lx)*.1; ly+=(my-ly)*.1;
+      if(light){
+        const pulseScale=1+lightPulse;
+        light.style.left=lx-130*pulseScale+'px';
+        light.style.top=ly-130*pulseScale+'px';
+        light.style.width=260*pulseScale+'px';
+        light.style.height=260*pulseScale+'px';
+        lightPulse*=.92;
+      }
+      requestAnimationFrame(moveLight);
+    }
+    moveLight();
+
+    // 点击涟漪 + 光晕脉冲
+    function createRipple(x,y){
+      const r=document.createElement('div');
+      r.className='light-ripple';
+      r.style.left=x+'px'; r.style.top=y+'px';
+      document.body.appendChild(r);
+      setTimeout(()=>r.remove(),1100);
+      lightPulse=0.4;
+    }
+    document.addEventListener('click',e=>{
+      if(e.target.closest('#page-story')) createRipple(e.clientX,e.clientY);
+    });
+    document.addEventListener('touchstart',e=>{
+      if(e.target.closest('#page-story')){const t=e.touches[0];if(t)createRipple(t.clientX,t.clientY);}
+    },{passive:true});
+
+    // ===== 打字机效果：正确保留HTML标签，只拆分文本节点 =====
+    const storyPage = document.getElementById('page-story');
+    const lines = storyPage.querySelectorAll('.type-line');
+    // 保存每行原始HTML，便于重复启动时恢复（避免intro-char嵌套）
+    const originalLineHTML = Array.from(lines).map(el => el.innerHTML);
+    const charInterval = 85; // 每字间隔ms
+    // 每行开始时间（与旁白同步的时间轴，可按需微调）
+    const lineStartTimes = [0, 2200, 5000, 7200, 10200, 14200, 18200];
+    let storyTimers = [];
+    let storyStarted = false;
+    let voiceAudio = null;
+
+    function clearStoryTimers(){ storyTimers.forEach(t=>clearTimeout(t)); storyTimers=[]; }
+
+    function resetStoryLines(){
+      lines.forEach((el, i) => { el.innerHTML = originalLineHTML[i]; });
+    }
+
+    function typeWriteLine(el, startTime){
+      // 先重置
+      el.classList.remove('visible');
+      // 使用TreeWalker只遍历文本节点，保留HTML标签结构
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      const textNodes = [];
+      let node;
+      while (node = walker.nextNode()) {
+        if (node.textContent.length > 0) textNodes.push(node);
+      }
+      let totalChars = 0;
+      textNodes.forEach(textNode => {
+        const text = textNode.textContent;
+        const parent = textNode.parentNode;
+        const fragment = document.createDocumentFragment();
+        for (let ch of text) {
+          if (ch === ' ' || ch === '\n' || ch === '\t' || ch === '·') {
+            fragment.appendChild(document.createTextNode(ch));
+          } else {
+            const span = document.createElement('span');
+            span.className = 'intro-char';
+            span.textContent = ch;
+            fragment.appendChild(span);
+            totalChars++;
+          }
+        }
+        parent.replaceChild(fragment, textNode);
+      });
+      // 行容器淡入
+      const t1 = setTimeout(()=>el.classList.add('visible'), Math.max(0, startTime - 100));
+      storyTimers.push(t1);
+      // 逐字显示
+      const chars = el.querySelectorAll('.intro-char');
+      chars.forEach((c, i) => {
+        const t = setTimeout(()=>c.classList.add('visible'), startTime + i * charInterval);
+        storyTimers.push(t);
+      });
+      return startTime + totalChars * charInterval;
+    }
+
+    function startStoryAnimation(){
+      if(storyStarted) return;
+      storyStarted = true;
+      clearStoryTimers();
+      // 恢复原始HTML后再拆分，避免重复启动时intro-char嵌套
+      resetStoryLines();
+      // 旁白不再随情景页自动播放，只由“听听隐藏的故事”入口触发。
+      // 重置所有行
+      lines.forEach(el=>{
+        el.classList.remove('visible');
+        el.querySelectorAll('.intro-char').forEach(c=>c.classList.remove('visible'));
+      });
+      btn.classList.remove('visible');
+      // 逐行打字
+      let lastEnd = 0;
+      lines.forEach((line, i) => {
+        const end = typeWriteLine(line, lineStartTimes[i] || (i * 1500));
+        lastEnd = Math.max(lastEnd, end);
+      });
+      // 按钮最后出现
+      const btnTimer = setTimeout(()=>btn.classList.add('visible'), lastEnd + 1000);
+      storyTimers.push(btnTimer);
+    }
+
+    // ===== 隐藏旁白：仅由入口触发，且只播放一次 =====
+    function initVoice(){
+      if(voiceAudio) return voiceAudio;
+      voiceAudio = new Audio('assets/voice.mp3');
+      voiceAudio.loop = false;
+      voiceAudio.volume = 0.85;
+      voiceAudio.preload = 'auto';
+      return voiceAudio;
+    }
+
+    function updateHiddenVoiceUI(state){
+      const btn = document.getElementById('hiddenVoiceBtn');
+      if(!btn) return;
+      const label = btn.querySelector('.hidden-voice-label');
+      if(state === 'playing'){
+        if(label) label.textContent = '正在聆听...';
+        btn.classList.add('is-playing');
+        btn.disabled = true;
+        btn.setAttribute('aria-label', '正在聆听...');
+      }else if(state === 'done'){
+        if(label) label.textContent = '已聆听';
+        btn.classList.remove('is-playing');
+        btn.disabled = true;
+        btn.setAttribute('aria-label', '已聆听');
+      }else{
+        if(label) label.textContent = '听听隐藏的故事';
+        btn.classList.remove('is-playing');
+        btn.disabled = false;
+        btn.setAttribute('aria-label', '听听隐藏的故事');
+      }
+    }
+
+    async function playHiddenVoice(){
+      if(!voiceAudio || voiceAudio.dataset.played === '1') return;
+      const v = voiceAudio;
+      v.dataset.played = '1';
+      v.currentTime = 0;
+      v.muted = false;
+      v.volume = 0.85;
+
+      // 从时间轴起点重新同步文案与旁白。
+      storyStarted = false;
+      clearStoryTimers();
+      startStoryAnimation();
+
+      updateHiddenVoiceUI('playing');
+      v.onended = () => updateHiddenVoiceUI('done');
+      v.onerror = () => {
+        delete v.dataset.played;
+        updateHiddenVoiceUI('ready');
+      };
+      try{
+        await v.play();
+      }catch(e){
+        delete v.dataset.played;
+        updateHiddenVoiceUI('ready');
+        console.warn('隐藏旁白播放失败:', e);
+      }
+    }
+
+    function stopStoryVoice(){
+      if(voiceAudio){
+        try{ voiceAudio.pause(); voiceAudio.currentTime=0; }catch(e){}
+      }
+    }
+    window.stopStoryVoice = stopStoryVoice;
+
+    function setStorySoundMuted(muted){
+      AudioEngine.setMuted(muted);
+      updateStorySoundUI(muted);
+      updateMusicSwitchUI(muted);
+      // 声音按钮只能关闭旁白，不能打开旁白（旁白仅由"听听隐藏的故事"触发）
+      if (muted) stopStoryVoice();
+    }
+
+    // 情景页进入只启动背景音乐，文案与旁白由"听听隐藏的故事"按钮同步触发。
+    function onStoryEnter(){
+      AudioEngine.unlock();
+      AudioEngine.pageBgm('story');
+    }
+
+    // 预加载旁白，但不自动播放。
+    initVoice();
+    const storySkipBtn=document.getElementById('storySkipBtn');
+    if(storySkipBtn && !storySkipBtn.dataset.ready){
+      storySkipBtn.dataset.ready='1';
+      storySkipBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        stopStoryVoice();
+        clearStoryTimers();
+        navigateTo('intro');
+      });
+    }
+
+    const storySoundBtn=document.getElementById('storySoundBtn');
+    if(storySoundBtn && !storySoundBtn.dataset.ready){
+      storySoundBtn.dataset.ready='1';
+      storySoundBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        const muted=!AudioEngine.isMuted();
+        setStorySoundMuted(muted);
+      });
+    }
+
+    const hiddenVoiceBtn=document.getElementById('hiddenVoiceBtn');
+    if(hiddenVoiceBtn && !hiddenVoiceBtn.dataset.ready){
+      hiddenVoiceBtn.dataset.ready='1';
+      hiddenVoiceBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        playHiddenVoice();
+      });
+    }
+    updateHiddenVoiceUI('ready');
+    updateStorySoundUI(
+AudioEngine.isMuted());
+    // 预先拆分文案为逐字span并保持隐藏，等待点击按钮后与旁白同步显示
+    startStoryAnimation();
+    clearStoryTimers();
+    lines.forEach(el=>{
+      el.classList.remove('visible');
+      el.querySelectorAll('.intro-char').forEach(c=>c.classList.remove('visible'));
+    });
+    btn.classList.remove('visible');
+    storyStarted = false;
+    // 页面进入后自动开始（旁白只属于情景页）
+    const autoTimer = setTimeout(()=>{
+      if(!storyStarted) onStoryEnter();
+    }, 50);
+    storyTimers.push(autoTimer);
   }
 
   // ===== P01 开场页 =====
@@ -1042,7 +1214,8 @@ if (index >= 3) {
       return;
     }
 
-    $('#btn-generate').disabled = false;
+    // 至少两个构件才能完成造字（单构件禁止进入下一页）
+    $('#btn-generate').disabled = comps.length < 2;
     canvas.classList.add('free-mode'); // 有构件即可编辑
     canvas.innerHTML = '';
 
@@ -1127,7 +1300,7 @@ if (index >= 3) {
     el.style.display = 'flex';
     el.style.alignItems = 'center';
     el.style.justifyContent = 'center';
-    el.style.fontFamily = '"ZhiMangXing", var(--font-ancient)';
+    el.style.fontFamily = 'var(--font-banshu)';
     el.style.fontSize = Math.min(w, h) * 0.7 + 'px';
     el.textContent = comp.name;
     el.dataset.id = comp.id;
@@ -1168,8 +1341,8 @@ if (index >= 3) {
     });
 
     $('#btn-generate').addEventListener('click', async () => {
-      if (AppState.currentChar.components.length === 0) {
-        showToast('先选择一个构件，让你的字有一个开始');
+      if (AppState.currentChar.components.length < 2) {
+        showToast('请选择两个构件，再完成造字');
         return;
       }
       // 保存用户编辑后的布局并导出完整新字图像（html2canvas截图）
@@ -1546,23 +1719,19 @@ if (index >= 3) {
       isRotating = false;
     });
 
-    // 手机触摸：单指拖动；双指捏住时独立调整宽度和高度，并可旋转构件。
-    // 规则：双指左右横向拉开/收拢 => 宽度；上下竖向拉开/收拢 => 高度；
-    // 双指连线角度变化 => 旋转。允许自由组合出任意宽窄比例和旋转角度。
+    // 手机触摸：单指拖动；双指捏住旋转选中构件（附带等比缩放）。
+    // 双指角度变化 => 旋转；双指距离变化 => 等比缩放。
     let pinchActive = false;
-    let pinchStartXDistance = 0;
-    let pinchStartYDistance = 0;
+    let pinchStartAngle = 0;
+    let pinchStartDistance = 0;
+    let pinchStartRotate = 0;
     let pinchStartW = 0;
     let pinchStartH = 0;
     let pinchStartLeft = 0;
     let pinchStartTop = 0;
-    let pinchStartAngle = 0;
-    let pinchStartRotate = 0;
 
-    const touchAxisDistance = (a, b) => ({
-      x: Math.abs(b.clientX - a.clientX),
-      y: Math.abs(b.clientY - a.clientY)
-    });
+    const touchAngle = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+    const touchDistance = (a, b) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
 
     el.addEventListener('touchstart', (e) => {
       document.querySelectorAll('.canvas-component.selected').forEach(s => s.classList.remove('selected'));
@@ -1574,16 +1743,13 @@ if (index >= 3) {
         pinchActive = true;
         isDragging = false;
         const a = e.touches[0], b = e.touches[1];
-        const axis = touchAxisDistance(a, b);
-        pinchStartXDistance = axis.x;
-        pinchStartYDistance = axis.y;
+        pinchStartAngle = touchAngle(a, b);
+        pinchStartDistance = touchDistance(a, b);
+        pinchStartRotate = parseFloat(el.dataset.rotate) || 0;
         pinchStartW = parseFloat(el.style.width) || el.getBoundingClientRect().width;
         pinchStartH = parseFloat(el.style.height) || el.getBoundingClientRect().height;
         pinchStartLeft = parseFloat(el.style.left) || 0;
         pinchStartTop = parseFloat(el.style.top) || 0;
-        // 记录双指连线初始角度和构件初始旋转角度，用于双指旋转
-        pinchStartAngle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
-        pinchStartRotate = parseFloat(el.dataset.rotate) || 0;
         e.preventDefault();
         return;
       }
@@ -1600,30 +1766,27 @@ if (index >= 3) {
     el.addEventListener('touchmove', (e) => {
       if (pinchActive && e.touches.length >= 2) {
         const a = e.touches[0], b = e.touches[1];
-        const axis = touchAxisDistance(a, b);
+        const currentAngle = touchAngle(a, b);
+        const currentDistance = touchDistance(a, b);
 
-        // 直接使用两个手指在 X/Y 方向的间距变化：
-        // X 越开，部件越宽；X 越收，部件越窄。
-        // Y 越开，部件越高；Y 越收，部件越矮。
-        // 当手指初始几乎重合时，使用绝对间距变化，避免除以接近 0 的数。
-        const xDelta = axis.x - pinchStartXDistance;
-        const yDelta = axis.y - pinchStartYDistance;
-        const newW = Math.max(24, Math.min(360, pinchStartW + xDelta));
-        const newH = Math.max(24, Math.min(360, pinchStartH + yDelta));
-
-        // 以原部件中心为锚点，调整宽高时不会产生位置漂移。
-        const centerX = pinchStartLeft + pinchStartW / 2;
-        const centerY = pinchStartTop + pinchStartH / 2;
-        el.style.width = newW + 'px';
-        el.style.height = newH + 'px';
-        el.style.left = (centerX - newW / 2) + 'px';
-        el.style.top = (centerY - newH / 2) + 'px';
-
-        // 双指旋转：计算双指连线角度变化，应用到构件旋转
-        const currentAngle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+        // 双指旋转：角度差直接应用到构件旋转
         const angleDelta = currentAngle - pinchStartAngle;
         const newRotate = pinchStartRotate + angleDelta;
         el.dataset.rotate = newRotate;
+
+        // 双指等比缩放：距离比作为缩放因子
+        if (pinchStartDistance > 0) {
+          const scale = Math.max(0.3, Math.min(2.5, currentDistance / pinchStartDistance));
+          const newW = Math.max(24, Math.min(360, pinchStartW * scale));
+          const newH = Math.max(24, Math.min(360, pinchStartH * scale));
+          // 以原构件中心为锚点，缩放时不漂移
+          const centerX = pinchStartLeft + pinchStartW / 2;
+          const centerY = pinchStartTop + pinchStartH / 2;
+          el.style.width = newW + 'px';
+          el.style.height = newH + 'px';
+          el.style.left = (centerX - newW / 2) + 'px';
+          el.style.top = (centerY - newH / 2) + 'px';
+        }
 
         applyComponentTransform(el);
         syncTransformPanel(el);
@@ -2305,14 +2468,14 @@ if (index >= 3) {
     await loadData();
 
     // 初始化各模块（每个都独立try-catch，防止一个失败影响全部）
-    const initFns = [initIntro, initNameInput, initAbility, initWorkshop, initMeaning, initCharCard, initCertify, initPoster, initCollection, initTopBar];
+    const initFns = [initStory, initIntro, initNameInput, initAbility, initWorkshop, initMeaning, initCharCard, initCertify, initPoster, initCollection, initTopBar];
     initFns.forEach(fn => {
       try { fn(); } catch(e) { console.error('初始化失败:', fn.name, e); }
     });
 
-    // 从情景引入页开始
+    // 从加载页开始
     try {
-      navigateTo('scene');
+      navigateTo('story');
     } catch(e) {
       console.error('导航失败:', e);
       // 兜底：直接显示intro页

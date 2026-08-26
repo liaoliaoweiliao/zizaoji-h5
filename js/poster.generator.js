@@ -181,11 +181,11 @@ const PosterGenerator = (function() {
       const comps = Array.isArray(data.components) ? data.components : [];
       if (comps.length) {
         const labels = comps.map(c => c.name || c.char || '').filter(Boolean);
-        ctx.font = '300px "Noto Serif SC", serif';
+        ctx.font = '300px "Honglei-Banshu", "Noto Serif SC", serif';
         ctx.fillText(labels.join(''), W / 2, H * 0.38);
       } else {
         ctx.fillStyle = '#999';
-        ctx.font = '40px "Noto Serif SC", serif';
+        ctx.font = '40px "Honglei-Banshu", "Noto Serif SC", serif';
         ctx.fillText('新造字', W / 2, H * 0.38);
       }
       ctx.restore();
@@ -200,7 +200,7 @@ const PosterGenerator = (function() {
         if (reqId !== generateReqId) return;
         console.error('新造字图像加载失败:', e);
         ctx.fillStyle = '#999';
-        ctx.font = '40px "Noto Serif SC", serif';
+        ctx.font = '40px "Honglei-Banshu", "Noto Serif SC", serif';
         ctx.textAlign = 'center';
         ctx.fillText('（新造字）', W/2, H * 0.38);
       }
@@ -421,7 +421,7 @@ const PosterGenerator = (function() {
     if (data.components && data.components.length > 0) {
       drawCombinedChar(ctx, W/2, charY, charSize, data);
     } else {
-      ctx.font = `${charSize}px "STKaiti", "KaiTi", "楷体", serif`;
+      ctx.font = `${charSize}px "Honglei-Banshu", "STKaiti", "KaiTi", "楷体", serif`;
       ctx.fillStyle = '#1a1a1a';
       ctx.fillText(data.charName || '字', W/2, charY);
     }
@@ -494,7 +494,7 @@ const PosterGenerator = (function() {
     // 用文字绘制构件（SVG在canvas中绘制较复杂，用字体替代）
     ctx.save();
     ctx.translate(x, y);
-    ctx.font = `${Math.min(w, h)}px "STKaiti", "KaiTi", "楷体", serif`;
+    ctx.font = `${Math.min(w, h)}px "Honglei-Banshu", "STKaiti", "KaiTi", "楷体", serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#1a1a1a';
