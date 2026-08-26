@@ -1,24 +1,26 @@
 /* 字造集：内置字体，避免手机预览因系统字体不同造成字形/排版跳变。 */
+/* font-display: swap：文本先用回退字体显示，字体加载完成后无缝替换，避免手机端文字长时间空白/阻塞渲染 */
 @font-face {
   font-family: "Zizaoji-Serif";
   src: url("zizaoji-serif.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 900;
-  font-display: block;
+  font-display: swap;
 }
 @font-face {
   font-family: "Zizaoji-Sans";
   src: url("zizaoji-sans.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 900;
-  font-display: block;
+  font-display: swap;
 }
 @font-face {
   font-family: "Honglei-Banshu";
-  src: url("hongleibanshu.ttf") format("truetype");
+  /* woff2 无损压缩版（约原 ttf 一半体积），旧浏览器回退 ttf */
+  src: url("hongleibanshu.woff2") format("woff2"), url("hongleibanshu.ttf") format("truetype");
   font-style: normal;
   font-weight: normal;
-  font-display: block;
+  font-display: swap;
 }
 
 :root {

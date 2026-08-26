@@ -94,6 +94,7 @@
       if (!audioCache[key]) {
         const a = new Audio(base + tracks[key]);
         a.preload = 'auto';
+        try { a.load(); } catch(e) {}
         audioCache[key] = a;
       }
       return audioCache[key];
@@ -104,6 +105,15 @@
       const queued = pending.splice(0);
       queued.forEach(args => playSfx.apply(null, args));
       if (currentBgmKey) startBgm(currentBgmKey, currentBgm?._zDb ?? -20, true);
+    }
+    // 手机端：每次用户交互时检查并恢复被暂停的BGM
+    function ensureBgmRunning() {
+      if (window.__zizaojiMuted) return;
+      if (!unlocked) { unlock(); return; }
+      if (currentBgm && currentBgm.paused && currentBgmKey) {
+        currentBgm.volume = dbToVolume(currentBgm._zDb ?? -20);
+        currentBgm.play().catch(() => {});
+      }
     }
     function fadeTo(audio, target, ms, done) {
       if (!audio) { if (done) done(); return; }
@@ -122,8 +132,17 @@
       const target = dbToVolume(db);
       a.loop = true;
       a._zDb = db;
+      // 相同BGM且正在播放：只调音量
       if (currentBgm === a && !a.paused) {
         if (Math.abs(a.volume - target) > 0.01) fadeTo(a, target, fadeMs);
+        return;
+      }
+      // 相同BGM但被暂停了（手机端常见）：恢复播放
+      if (currentBgm === a && a.paused) {
+        a.volume = immediate ? target : 0;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => {});
+        if (!immediate) fadeTo(a, target, fadeMs);
         return;
       }
       if (currentBgm && currentBgm !== a) {
@@ -134,11 +153,19 @@
       currentBgmKey = key;
       a.volume = immediate ? target : 0;
       const p = a.play();
-      if (p && p.catch) p.catch(() => { unlocked = false; });
+      if (p && p.catch) p.catch(() => {
+        // 手机端播放失败时不重置unlocked，等待下次用户交互恢复
+        console.warn('BGM play failed, will retry on next user interaction');
+      });
       if (!immediate) fadeTo(a, target, fadeMs);
     }
     function pageBgm(pageId) {
       if (window.__zizaojiMuted) return;
+      // 手机端保障：页面切换时若BGM被暂停则恢复
+      if (unlocked && currentBgm && currentBgm.paused && currentBgmKey) {
+        currentBgm.volume = dbToVolume(currentBgm._zDb ?? -20);
+        currentBgm.play().catch(() => {});
+      }
       const key = bgmByPage[pageId];
       // 配置为 null 的页面不播放背景音乐，停止当前BGM
       if (key === null) {
@@ -207,13 +234,14 @@
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; return; }
       startBgm(key, db, false);
     }
-    return { unlock, pageBgm, playSfx, fadeBgmOut, setMeaningStyle, getAudio, setMuted, toggleMuted, isMuted };
+    return { unlock, pageBgm, playSfx, fadeBgmOut, setMeaningStyle, getAudio, setMuted, toggleMuted, isMuted, ensureBgmRunning };
   })();
   window.AudioEngine = AudioEngine;
 
   // 浏览器自动播放策略：首次用户操作后立即解锁，并补播需要的交互声。
+  // 手机端额外保障：每次交互都检查BGM是否被暂停，若暂停则恢复。
   ['pointerdown','touchstart','keydown'].forEach(evt =>
-    document.addEventListener(evt, () => AudioEngine.unlock(), { once: true, passive: true })
+    document.addEventListener(evt, () => AudioEngine.ensureBgmRunning(), { passive: true })
   );
 
   function showToast(msg, duration = 2000) {
@@ -260,7 +288,13 @@
           charcard:['charcard','我把它记下来了。'],
           collection:['collection','每一个字，都有属于自己的故事哦。']
           };
-          if(xuanMap[pageId]) XuanXuan.show(...xuanMap[pageId]);
+          if(xuanMap[pageId]){
+            XuanXuan.show(...xuanMap[pageId]);
+          }else{
+            // 不在映射内的页面（造字人格、海报、释义、能力值、加载等）隐藏玄玄，避免残留遮挡画面
+            const xuanEl=document.getElementById('xuanxuan');
+            if(xuanEl) xuanEl.style.display='none';
+          }
        }
        AudioEngine.pageBgm(pageId);
       // 触发页面初始化
@@ -419,8 +453,11 @@
     },
 
     poster() {
-      generatePoster();
-      renderBgSwitcher();
+      // 确保海报脚本已加载后再生成海报与渲染背景切换（懒加载，不阻塞首屏）
+      ensurePosterScripts().then(() => {
+        generatePoster();
+        renderBgSwitcher();
+      });
     },
 
     collection() {
@@ -1208,7 +1245,8 @@ if (index >= 3) {
       return;
     }
 
-    $('#btn-generate').disabled = false;
+    // 至少两个构件才能完成造字（单构件禁止进入下一页）
+    $('#btn-generate').disabled = comps.length < 2;
     canvas.classList.add('free-mode'); // 有构件即可编辑
     canvas.innerHTML = '';
 
@@ -1334,8 +1372,8 @@ if (index >= 3) {
     });
 
     $('#btn-generate').addEventListener('click', async () => {
-      if (AppState.currentChar.components.length === 0) {
-        showToast('先选择一个构件，让你的字有一个开始');
+      if (AppState.currentChar.components.length < 2) {
+        showToast('请选择两个构件，再完成造字');
         return;
       }
       // 保存用户编辑后的布局并导出完整新字图像（html2canvas截图）
@@ -2165,7 +2203,36 @@ if (index >= 3) {
   }
 
   // ===== P09 海报页 =====
+  // 海报相关脚本（poster.generator.js / poster.embedded-images.js）在页面加载时不再同步引入，
+  // 避免 6.8MB 内嵌图片阻塞首屏。这里按需/后台懒加载，进入海报页前确保已就绪。
+  let _posterScriptsPromise = null;
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[data-poster-src="' + src + '"]')) return resolve();
+      const s = document.createElement('script');
+      s.src = src;
+      s.dataset.posterSrc = src;
+      s.onload = () => resolve();
+      s.onerror = () => {
+        // 加载失败时移除该元素，避免下次被误判为“已加载”而无法重试
+        if (s.parentNode) s.parentNode.removeChild(s);
+        reject(new Error('脚本加载失败: ' + src));
+      };
+      document.body.appendChild(s);
+    });
+  }
+  function ensurePosterScripts() {
+    if (!_posterScriptsPromise) {
+      // poster.generator.js 在模块定义时读取 ZZJ_EMBEDDED_IMAGES，须先加载内嵌图片再加载生成器
+      _posterScriptsPromise = loadScriptOnce('js/poster.embedded-images.js')
+        .then(() => loadScriptOnce('js/poster.generator.js'))
+        .catch(err => { _posterScriptsPromise = null; throw err; });
+    }
+    return _posterScriptsPromise;
+  }
+
   async function generatePoster() {
+    await ensurePosterScripts();
     const canvas = $('#poster-canvas');
     const char = AppState.collection[0] || AppState.currentChar;
 
@@ -2476,6 +2543,10 @@ if (index >= 3) {
       const intro = document.getElementById('page-intro');
       if (intro) intro.style.display = 'flex';
     }
+
+    // 应用可交互后即后台预载海报脚本（6.8MB 内嵌图片不阻塞首屏，且到海报页时通常已就绪）。
+    // 不等待 window.load——音频等资源会拖慢 load 事件，而首屏交互(DCL)才是用户感知的加载完成点。
+    setTimeout(() => { try { ensurePosterScripts(); } catch(e) {} }, 2000);
   }
 
   // DOM加载完成后初始化

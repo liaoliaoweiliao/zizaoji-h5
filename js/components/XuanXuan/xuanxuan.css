@@ -11,9 +11,10 @@
  display:block;
 }
 
+/* 对话气泡：置于角色头顶上方，避免贴底被裁切 */
 .xuan-dialog{
  position:absolute;
- top:105%;
+ bottom:105%;
  left:50%;
  transform:translateX(-50%);
  width:max-content;
@@ -25,32 +26,36 @@
  line-height:1.4;
 }
 
-/* 首页、情景页：右下角 */
+/* 首页、情景页：右下角，抬高避免气泡贴底 */
 .xuan-story,.xuan-intro{
  position:fixed;
  right:16px;
- bottom:24px;
+ bottom:72px;
 }
 
-/* 六书实验室：文案右下 */
+/* 六书实验室：移到右上空白区（位于副标题与“象形”标题之间、太阳图形右侧），避免遮挡演变动画与时间轴 */
 .xuan-lab{
  position:absolute;
- right:18%;
- top:145px;
+ right:60px;
+ top:180px;
 }
 
-/* 造字工坊：画布右上角 */
+/* 造字工坊：移到画面左侧空白区（绿色箭头指向侧），气泡锚定角色左侧向右展开，指向造字画布 */
 .xuan-workshop{
  position:absolute;
- right:24px;
- top:110px;
+ left:20px;
+ top:200px;
+}
+.xuan-workshop .xuan-dialog{
+ left:0;
+ transform:none;
 }
 
-/* 释义页：新造字右侧 */
+/* 释义页：右下角，避开六书环形图 */
 .xuan-analysis{
  position:absolute;
- left:calc(50% + 120px);
- top:45%;
+ right:30px;
+ bottom:40px;
 }
 
 /* 字卡页 */
@@ -69,10 +74,10 @@
 
 @media(max-width:768px){
  #xuanxuan{width:64px}
- .xuan-story,.xuan-intro{right:12px;bottom:18px}
- .xuan-lab{right:12%;top:125px}
- .xuan-workshop{right:10px;top:70px}
- .xuan-analysis{left:auto;right:12px;top:42%}
+ .xuan-story,.xuan-intro{right:12px;bottom:52px}
+ .xuan-lab{right:46px;top:220px}
+ .xuan-workshop{left:12px;top:200px}
+ .xuan-analysis{right:12px;bottom:30px}
  .xuan-charcard{right:12px;bottom:60px}
  .xuan-collection{right:10px;bottom:20px}
  .xuan-dialog{max-width:140px;font-size:11px}

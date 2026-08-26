@@ -4,7 +4,9 @@ window.XuanXuan={
   let d=document.createElement('div');
   d.id='xuanxuan';
   d.innerHTML='<img id="xuan-img" src="assets/xuanxuan/tantou.png"><div class="xuan-dialog"></div>';
-  document.body.appendChild(d);
+  // 挂到 #app 内，使玄玄定位相对应用列（移动端=视口，桌面端=居中的应用列），避免桌面端飘到视口边缘
+  const host = document.getElementById('app') || document.body;
+  host.appendChild(d);
  },
  show(type,text=''){
   this.init();
