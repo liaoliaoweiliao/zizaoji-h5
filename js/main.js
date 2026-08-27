@@ -102,6 +102,10 @@
     function unlock() {
       if (unlocked) return;
       unlocked = true;
+      // 手机端关键修复：用户首次交互后强制加载所有BGM，确保后续页面切换时音频已就绪
+      ['bgmHome','bgmCollection','bgmMeaning','bgmPoster'].forEach(k => {
+        try { const a = getAudio(k); a.preload = 'auto'; a.load(); } catch(e) {}
+      });
       const queued = pending.splice(0);
       queued.forEach(args => playSfx.apply(null, args));
       if (currentBgmKey) startBgm(currentBgmKey, currentBgm?._zDb ?? -20, true);
@@ -127,20 +131,24 @@
       };
       requestAnimationFrame(step);
     }
-    // 带重试的音频播放：play()失败时等待canplay后重试，确保BGM能播出来
+    // 带重试的音频播放：play()失败时强制加载并等待canplay/loadeddata后重试，确保BGM能播出来
     function playWithRetry(a) {
+      if (!a || !a.paused) return; // 已在播放则无需重试
       const doPlay = () => {
         const p = a.play();
         if (p && p.catch) {
           p.catch(() => {
-            // 播放失败（通常是音频未加载完成），等待canplay后重试
+            // 播放失败（通常是音频未加载完成），强制加载后等待就绪
+            try { a.load(); } catch(e) {}
             const onReady = () => { a.play().catch(() => {}); };
             a.addEventListener('canplay', onReady, { once: true });
-            // 兜底：1.5秒后强制重试
+            a.addEventListener('loadeddata', onReady, { once: true });
+            // 兜底：1秒后强制重试
             setTimeout(() => {
               a.removeEventListener('canplay', onReady);
+              a.removeEventListener('loadeddata', onReady);
               if (a.paused) a.play().catch(() => {});
-            }, 1500);
+            }, 1000);
           });
         }
       };
@@ -252,9 +260,18 @@
     ['bgmHome','bgmCollection','bgmMeaning','bgmPoster'].forEach(k => {
       try { const a = getAudio(k); a.preload = 'auto'; a.load(); } catch(e) {}
     });
+    // 定期监控：每2秒检查BGM是否被意外暂停，自动恢复（解决手机端浏览器后台暂停问题）
+    setInterval(() => {
+      if (window.__zizaojiMuted || !unlocked || !currentBgmKey) return;
+      if (currentBgm && currentBgm.paused) {
+        currentBgm.volume = dbToVolume(currentBgm._zDb ?? -20);
+        playWithRetry(currentBgm);
+      }
+    }, 2000);
     return { unlock, pageBgm, playSfx, fadeBgmOut, setMeaningStyle, getAudio, setMuted, toggleMuted, isMuted, ensureBgmRunning };
   })();
   window.AudioEngine = AudioEngine;
+  console.log('[字造集4.0] AudioEngine v27-10 已加载，四页共享BGM修复已启用');
 
   // 浏览器自动播放策略：首次用户操作后立即解锁，并补播需要的交互声。
   // 手机端额外保障：每次交互都检查BGM是否被暂停，若暂停则恢复。
@@ -453,6 +470,8 @@
     },
 
     analysis() {
+      // 提前预加载释义页BGM，确保切换时已就绪（手机端关键）
+      try { const a = AudioEngine.getAudio('bgmMeaning'); a.preload = 'auto'; a.load(); } catch(e) {}
       startAnalysisAnimation();
     },
 
