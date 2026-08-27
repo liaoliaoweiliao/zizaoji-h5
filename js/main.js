@@ -69,8 +69,8 @@
     const bgmVolumes = {
       story: -10, intro: -10,
       loading: -2, lab: -4, ability: -8, workshop: -2,
-      analysis: -6, meaning: -5, charcard: -5, certify: -5,
-      poster: -5, collection: -6
+      analysis: -6, meaning: -10, charcard: -10, certify: -10,
+      poster: -10, collection: -6
     };
     const bgmByPage = {
       loading: 'bgmHome', story: 'bgmHome', intro: 'bgmHome', lab: 'bgmCollection',
@@ -197,6 +197,12 @@
       if (!key) return;
       const db = bgmVolumes[pageId] ?? -20;
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; try { currentBgm.currentTime = 0; } catch(e) {} return; }
+      // 释义/字卡/造字人格/海报四页共享 meaning-story：若已在播放同一BGM则完全不操作，确保不中断、不重新开始
+      const sharedPages = ['meaning','charcard','certify','poster'];
+      if (sharedPages.includes(pageId) && currentBgm === getAudio(key) && !currentBgm.paused) {
+        if (Math.abs(currentBgm.volume - dbToVolume(db)) > 0.01) currentBgm.volume = dbToVolume(db);
+        return;
+      }
       startBgm(key, db, false, pageId === 'ability' ? 5000 : 500);
     }
     function playSfx(key, db, maxMs, rate=1, queueIfLocked=true) {
