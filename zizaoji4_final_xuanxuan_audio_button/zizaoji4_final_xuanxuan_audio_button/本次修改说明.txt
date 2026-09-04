@@ -1,0 +1,68 @@
+本次修改说明（2026-08-26）
+
+已完成三项修改：
+
+1. 玄玄位置调整，使其不遮挡任何画面
+   - 修改文件：js/components/XuanXuan/xuanxuan.css
+   - 对话气泡改为显示在角色头顶上方（.xuan-dialog bottom:105%），
+     解决气泡贴底被裁切的问题（情景页、开场页、字卡页、字造集等）。
+   - 六书实验室：玄玄移至右下角（原为右上中部），避开演变动画区。
+   - 释义/构形分析页：玄玄移至右下角（原为环形图右侧），不再遮挡六书环形图。
+   - 情景页、开场页：玄玄适当抬高，气泡不再贴底。
+   - 造字工坊、字卡页、字造集：保持角落位置，不遮挡画布与按钮。
+
+2. 造字人格页面、海报页面删除玄玄
+   - 修改文件：js/main.js（navigateTo）
+   - 玄玄仅在情景页、开场页、实验室、工坊、构形分析、字卡、字造集显示；
+   - 造字人格页（certify）、海报页（poster）以及释义页、能力值页、加载页等
+     不在映射内的页面一律隐藏玄玄，避免前一页残留导致遮挡。
+
+3. 造字工坊：单部件禁止进入下一页
+   - 修改文件：js/main.js
+   - 只选择 1 个构件时，“完成造字”按钮不可点击（disabled）。
+   - 点击“完成造字”增加兜底校验：构件数 < 2 时拦截并提示，
+     无法进入下一页。
+   - 选择 2 个构件后按钮激活，可继续造字进入下一页。
+
+另外：index.html 中对 js/main.js、js/components/XuanXuan/xuanxuan.css
+增加了版本参数（v=20260826-01），避免浏览器缓存旧资源导致不生效。
+
+注意：js/components/XuanXuan/mobile-position.js、scene-layout.css 为
+未使用的历史文件（未在 index.html 中加载），未做改动。
+
+
+===== 第二轮修改（2026-08-27）=====
+
+1. 按图片要求调整六书实验室、造字工坊玄玄位置
+   - 修改文件：js/components/XuanXuan/xuanxuan.css、xuanxuan.js
+   - 六书实验室：玄玄由右下角移至右上空白区（副标题与“象形”标题之间、
+     太阳图形右侧），不遮挡演变动画、时间轴与标题。
+     移动端 right:46px; top:220px；桌面端 right:60px; top:180px。
+   - 造字工坊：玄玄由右上角移至画面左侧空白区（绿色箭头指向侧），
+     气泡锚定角色左侧向右展开，指向造字画布，不遮挡标题与画布。
+     移动端 left:12px; top:200px；桌面端 left:20px; top:200px。
+   - 玄玄由挂到 body 改为挂到 #app 容器内，定位相对应用列：
+     移动端表现不变，桌面端不再飘到浏览器视口边缘，始终在居中的应用列内。
+
+2. 修复手机打开网页加载慢
+   - 首屏总字节由约 14MB 降至约 2.3MB（1.5Mbps 慢网下可交互时间约 3.7s）。
+   - 懒加载海报脚本：poster.embedded-images.js（6.8MB）与 poster.generator.js
+     不再在页面加载时同步下载，改为应用可交互后 2 秒后台预载、进入海报页前
+     确保加载（main.js 新增 ensurePosterScripts）。html2canvas.min.js 因
+     工坊导出字形需要使用，保留静态加载。
+   - 压缩大图：
+     - assets/icons/star.png：2048×2048(3.3MB) → 128×128(28KB)
+     - assets/images/seal-zizaoji.png：1254×1254(1.98MB) → 256×256(111KB)
+       ，并给 charcard/certify 页印章 img 加 loading="lazy"，首屏不再下载。
+     - assets/images/paper-bg.png：2MB → paper-bg.jpg(131KB)，
+       style.css 中 4 处引用同步改为 jpg。
+   - 字体优化：
+     - fonts.css 三个 @font-face 的 font-display 由 block 改为 swap，
+       文字先用回退字体显示、字体加载完成后再替换，避免手机端文字长时间空白。
+     - Honglei-Banshu 7.2MB ttf 无损转换为 woff2（3.7MB，约减半），
+       fonts.css 改为优先引用 woff2、旧浏览器回退 ttf。
+   - index.html 版本参数统一更新为 v=20260827-03，避免缓存旧资源。
+
+验证：Puppeteer 移动端(390×844)与桌面端(1280×960)双视口全流程通过——
+   lab/workshop 玄玄位置正确且不遮挡、certify/poster 玄玄仍隐藏、
+   工坊单构件仍被拦截、海报页在懒加载下正常生成、印章与字体渲染正常。

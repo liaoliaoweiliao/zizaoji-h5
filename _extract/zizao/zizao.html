@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>字造集 · 汉字情绪画廊</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink-900: #000000;
+      --paper-100: #f5f0e6;
+      --paper-200: #e8e0d0;
+      --paper-300: #9a9486;
+      --seal: #a83f39;
+      --seal-light: #c45c52;
+      --gold: #b89b4a;
+      --perspective: 1500px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--ink-900);
+      color: var(--paper-100);
+      font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+      -webkit-font-smoothing: antialiased;
+      touch-action: none;
+      user-select: none;
+    }
+
+    /* ===== Global ambient starfield (behind gallery & mood-select) ===== */
+    #starCanvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ===== Gallery: pure black infinite void ===== */
+    .stage-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 70% at 50% 46%, rgba(20, 18, 16, 0.55) 0%, transparent 60%),
+        radial-gradient(ellipse 120% 120% at 50% 50%, transparent 55%, rgba(0,0,0,0.85) 100%),
+        #000;
+    }
+
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 10;
+      padding: 26px 20px 16px;
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 0.9s ease;
+    }
+    body.focusing header { opacity: 0; }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.5em;
+      text-indent: 0.5em;
+      color: var(--paper-100);
+      text-shadow: 0 4px 30px rgba(0,0,0,0.9);
+    }
+    header p {
+      margin-top: 9px;
+      font-size: 0.7rem;
+      letter-spacing: 0.24em;
+      color: var(--paper-300);
+      opacity: 0.6;
+    }
+
+    .scene {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      perspective: var(--perspective);
+      perspective-origin: 50% 50%;
+      overflow: hidden;
+      cursor: grab;
+    }
+    .scene:active { cursor: grabbing; }
+
+    .cloud {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+    }
+
+    .card {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      border-radius: 9px;
+      overflow: hidden;
+      box-shadow: 0 16px 46px rgba(0,0,0,0.6);
+      cursor: pointer;
+      will-change: transform, opacity, filter;
+      transform-origin: center;
+      backface-visibility: hidden;
+      transition: box-shadow 0.4s ease;
+      background: linear-gradient(135deg, #1a1814, #2a2620);
+    }
+    .card.img-missing img { display: none; }
+    .card.img-missing::before {
+      content: attr(data-title);
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: rgba(245,240,230,0.5);
+      letter-spacing: 0.2em;
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0) 58%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+    }
+
+    .card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    .card-label {
+      position: absolute;
+      bottom: 9px;
+      left: 11px;
+      z-index: 2;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.85);
+      opacity: 0;
+      transform: translateY(7px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      pointer-events: none;
+    }
+    .card.hovered .card-label { opacity: 1; transform: translateY(0); }
+    body.show-labels .card-label { opacity: 0.9; transform: none; }
+
+    .card.focused {
+      box-shadow: 0 0 0 1px rgba(245,240,230,0.10),
+                  0 50px 130px rgba(0,0,0,0.8),
+                  0 0 150px rgba(245,240,230,0.10);
+    }
+
+    .drag-hint {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      color: var(--paper-300);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.2s ease;
+    }
+    .drag-hint.show { opacity: 0.5; }
+
+    /* Detail / focus panel (Scroll Mask reveal) */
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .detail-overlay.active { pointer-events: auto; }
+
+    .detail-panel {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 44px 24px 48px;
+      background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 26%, rgba(0,0,0,0.92) 100%);
+      transform: translateY(40px);
+      opacity: 0;
+      clip-path: inset(0 46% 100% 46% round 16px);
+      transition: transform 0.75s cubic-bezier(0.22,1,0.36,1),
+                  opacity 0.6s ease,
+                  clip-path 0.85s cubic-bezier(0.22,1,0.36,1);
+    }
+    .detail-overlay.active .detail-panel {
+      transform: translateY(0);
+      opacity: 1;
+      clip-path: inset(0 0 0 0 round 0);
+    }
+
+    .detail-content { max-width: 720px; margin: 0 auto; position: relative; }
+
+    .detail-content::before {
+      content: attr(data-char);
+      position: absolute;
+      top: -84px;
+      right: -4px;
+      font-size: 7rem;
+      font-weight: 700;
+      color: rgba(245, 240, 230, 0.045);
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .detail-pinyin {
+      font-size: 0.9rem;
+      letter-spacing: 0.16em;
+      color: var(--gold);
+      margin-bottom: 7px;
+    }
+    .detail-title {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-indent: 0.22em;
+      margin-bottom: 16px;
+    }
+    .detail-tag {
+      display: inline-block;
+      padding: 7px 16px;
+      border: 1px solid var(--seal);
+      color: var(--seal-light);
+      font-size: 0.74rem;
+      letter-spacing: 0.12em;
+      margin-bottom: 22px;
+      border-radius: 2px;
+    }
+    .detail-desc {
+      font-size: 1rem;
+      line-height: 2.05;
+      color: var(--paper-200);
+      letter-spacing: 0.04em;
+      margin-bottom: 26px;
+    }
+
+    .create-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 30px;
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-indent: 0.18em;
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
+    }
+    .create-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(201,168,86,0.25), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    .create-btn:hover {
+      color: var(--paper-100);
+      background: rgba(184,155,74,0.12);
+      box-shadow: 0 0 30px rgba(184,155,74,0.35);
+    }
+    .create-btn:hover::after { opacity: 1; }
+    .create-btn .arrow { font-size: 1.1rem; }
+
+    .close-btn {
+      position: absolute;
+      top: -64px;
+      right: 4px;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(245,240,230,0.18);
+      background: rgba(10, 9, 8, 0.55);
+      color: var(--paper-100);
+      font-size: 1.5rem;
+      line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .close-btn:active { background: rgba(35, 30, 25, 0.85); }
+
+    /* ===== Mood-select screen (replaces the 5-glyph intro) ===== */
+    .mood-select {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse 70% 60% at 50% 38%, rgba(30,26,22,0.5) 0%, transparent 60%),
+        radial-gradient(ellipse 120% 120% at 50% 50%, transparent 45%, rgba(0,0,0,0.9) 100%),
+        rgba(4,3,2,0.72);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 1.2s ease, visibility 1.2s ease;
+      overflow-y: auto;
+    }
+    .mood-select.show { opacity: 1; visibility: visible; }
+
+    .ms-inner {
+      text-align: center;
+      padding: 60px 22px 50px;
+      max-width: 920px;
+      width: 100%;
+    }
+    .ms-eyebrow {
+      font-size: 0.72rem;
+      letter-spacing: 0.4em;
+      text-indent: 0.4em;
+      color: var(--gold);
+      opacity: 0;
+      transform: translateY(14px);
+      animation: msUp 1s ease 0.1s forwards;
+    }
+    .ms-title {
+      font-size: clamp(1.7rem, 5.4vw, 2.9rem);
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-indent: 0.22em;
+      margin: 16px 0 14px;
+      opacity: 0;
+      transform: translateY(18px);
+      animation: msUp 1.1s ease 0.28s forwards;
+      text-shadow: 0 0 50px rgba(245,240,230,0.12);
+    }
+    .ms-sub {
+      font-size: 0.96rem;
+      line-height: 2;
+      letter-spacing: 0.08em;
+      color: rgba(232,224,208,0.72);
+      opacity: 0;
+      transform: translateY(18px);
+      animation: msUp 1.1s ease 0.46s forwards;
+    }
+    .ms-grid {
+      margin: 38px auto 30px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      max-width: 720px;
+    }
+    .ms-tile {
+      position: relative;
+      padding: 20px 10px 18px;
+      border: 1px solid rgba(245,240,230,0.12);
+      border-radius: 10px;
+      background: linear-gradient(160deg, rgba(245,240,230,0.05), rgba(245,240,230,0.012));
+      cursor: pointer;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(22px) scale(0.96);
+      animation: msTile 0.9s cubic-bezier(0.22,1,0.36,1) forwards;
+      transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease, background 0.4s ease;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .ms-tile:hover {
+      border-color: rgba(201,168,86,0.5);
+      box-shadow: 0 0 34px rgba(201,168,86,0.18), inset 0 0 24px rgba(201,168,86,0.06);
+      background: linear-gradient(160deg, rgba(201,168,86,0.10), rgba(245,240,230,0.02));
+      transform: translateY(-4px) scale(1.02);
+    }
+    .ms-tile .t-name {
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-indent: 0.16em;
+      color: var(--paper-100);
+    }
+    .ms-tile .t-line {
+      margin-top: 9px;
+      font-size: 0.68rem;
+      line-height: 1.7;
+      letter-spacing: 0.06em;
+      color: rgba(232,224,208,0.6);
+    }
+    .ms-tile .t-glow {
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(circle at 50% 120%, rgba(201,168,86,0.18), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    .ms-tile:hover .t-glow { opacity: 1; }
+    @keyframes msTile { to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes msUp { to { opacity: 1; transform: translateY(0); } }
+
+    .ms-random {
+      margin-top: 8px;
+      padding: 12px 34px;
+      background: transparent;
+      border: 1px solid rgba(245,240,230,0.22);
+      color: var(--paper-200);
+      font-family: inherit;
+      font-size: 0.86rem;
+      letter-spacing: 0.28em;
+      text-indent: 0.28em;
+      border-radius: 3px;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(18px);
+      animation: msUp 1.1s ease 1.1s forwards;
+      transition: color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+    }
+    .ms-random:hover {
+      color: var(--paper-100);
+      border-color: rgba(245,240,230,0.5);
+      box-shadow: 0 0 26px rgba(245,240,230,0.12);
+    }
+
+    /* ===== Opening gate (kaichangbeijingtu + flowing river + stars + glass cursor) ===== */
+    .opening {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: #000;
+      transition: opacity 1.4s ease, visibility 1.4s ease;
+    }
+    .opening.done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    .opening .obg {
+      position: absolute;
+      inset: 0;
+      background: url('kaichangbeijingtu.jpg') center center / cover no-repeat;
+      transform: scale(1.06);
+      animation: obgDrift 26s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+    @keyframes obgDrift {
+      0%   { transform: scale(1.06) translate(-1.2%, -0.8%); }
+      50%  { transform: scale(1.10) translate(1.0%, 0.6%); }
+      100% { transform: scale(1.07) translate(0.6%, -1.1%); }
+    }
+
+    /* flowing river light + caustics */
+    .opening .oriver {
+      position: absolute;
+      inset: -20%;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(105deg,
+          rgba(245,240,230,0) 0px,
+          rgba(245,240,230,0.05) 60px,
+          rgba(201,168,86,0.04) 120px,
+          rgba(245,240,230,0) 200px);
+      mix-blend-mode: screen;
+      opacity: 0.7;
+      animation: riverFlow 14s linear infinite;
+    }
+    @keyframes riverFlow {
+      0%   { background-position: 0 0; }
+      100% { background-position: 600px 240px; }
+    }
+    .opening .ocaustics {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      opacity: 0.5;
+    }
+
+    .opening #openingStars {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .opening canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      touch-action: none;
+      cursor: none;
+    }
+
+    .opening .oguide {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      font-size: clamp(240px, 52vw, 560px);
+      font-weight: 700;
+      color: rgba(245, 240, 230, 0.05);
+      pointer-events: none;
+      letter-spacing: 0;
+      text-shadow: 0 0 60px rgba(245,240,230,0.08);
+      transition: opacity 0.6s ease, color 0.6s ease;
+    }
+    .opening .oguide.glow {
+      color: rgba(245, 240, 230, 0.16);
+      text-shadow: 0 0 90px rgba(201, 168, 86, 0.5);
+    }
+
+    .opening .oui {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 28px 24px 34px;
+    }
+    .opening .otop {
+      text-align: center;
+      opacity: 0;
+      transform: translateY(-10px);
+      animation: fadeDown 1.2s ease 0.3s forwards;
+    }
+    .opening .otop h1 {
+      font-size: clamp(1.6rem, 5vw, 2.6rem);
+      letter-spacing: 0.45em;
+      text-indent: 0.45em;
+      font-weight: 700;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.9);
+    }
+    .opening .otop p {
+      margin-top: 8px;
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      color: rgba(245,240,230,0.55);
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+    }
+    .opening .ohint {
+      text-align: center;
+      font-size: 0.78rem;
+      letter-spacing: 0.18em;
+      color: rgba(245,240,230,0.5);
+      text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+      opacity: 0;
+      animation: fadeUp 1.2s ease 0.8s forwards;
+    }
+
+    .opening .ocontrols {
+      position: absolute;
+      right: 18px;
+      top: 18px;
+      z-index: 5;
+      pointer-events: auto;
+    }
+    .opening .ocontrols button {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(245,240,230,0.22);
+      color: rgba(245,240,230,0.8);
+      font-family: inherit;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      padding: 7px 12px;
+      border-radius: 2px;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: all 0.3s ease;
+      margin-left: 8px;
+    }
+    .opening .ocontrols button:hover { background: rgba(0,0,0,0.55); color: var(--paper-100); }
+    #enterBtn { display: none; }
+    #enterBtn.show { display: inline-block; }
+
+    .opening .osuccring {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 120vmax; height: 120vmax;
+      transform: translate(-50%, -50%) scale(0);
+      z-index: 6;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(201,168,86,0.18) 0%, transparent 55%);
+      pointer-events: none;
+      transition: transform 1.4s cubic-bezier(0.22,1,0.36,1), opacity 1s ease;
+    }
+    .opening .osuccring.open {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0;
+    }
+    .opening .osucctext {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 6;
+      font-size: clamp(3rem, 10vw, 6rem);
+      letter-spacing: 0.3em;
+      text-indent: 0.3em;
+      font-weight: 700;
+      color: var(--paper-100);
+      text-shadow: 0 0 60px rgba(201,168,86,0.6);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s ease;
+    }
+    .opening .osucctext.show { opacity: 1; }
+
+    /* ===== Create-journey overlay (开始造字之旅) ===== */
+    .create-journey {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse 70% 60% at 50% 40%, rgba(28,24,20,0.6) 0%, transparent 60%),
+        rgba(2,2,2,0.93);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+      overflow-y: auto;
+    }
+    .create-journey.show { opacity: 1; visibility: visible; }
+
+    .cj-inner {
+      position: relative;
+      width: 100%;
+      max-width: 560px;
+      padding: 54px 26px 40px;
+      text-align: center;
+    }
+    .cj-seed {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-indent: 0.18em;
+      color: var(--paper-100);
+      text-shadow: 0 0 40px rgba(245,240,230,0.12);
+      opacity: 0;
+      transform: translateY(16px);
+      animation: msUp 0.9s ease 0.1s forwards;
+    }
+    .cj-sub {
+      margin: 14px auto 26px;
+      font-size: 0.92rem;
+      line-height: 1.9;
+      letter-spacing: 0.06em;
+      color: rgba(232,224,208,0.7);
+      max-width: 420px;
+      opacity: 0;
+      transform: translateY(16px);
+      animation: msUp 0.9s ease 0.26s forwards;
+    }
+    .cj-input {
+      width: 100%;
+      max-width: 360px;
+      padding: 13px 18px;
+      background: rgba(245,240,230,0.04);
+      border: 1px solid rgba(245,240,230,0.18);
+      border-radius: 4px;
+      color: var(--paper-100);
+      font-family: inherit;
+      font-size: 1.05rem;
+      letter-spacing: 0.18em;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.4s ease, box-shadow 0.4s ease;
+      opacity: 0;
+      transform: translateY(16px);
+      animation: msUp 0.9s ease 0.42s forwards;
+    }
+    .cj-input::placeholder { color: rgba(232,224,208,0.35); letter-spacing: 0.1em; }
+    .cj-input:focus { border-color: var(--gold); box-shadow: 0 0 22px rgba(184,155,74,0.25); }
+
+    .cj-canvas {
+      display: block;
+      width: 100%;
+      max-width: 360px;
+      height: 230px;
+      margin: 22px auto 6px;
+      border: 1px dashed rgba(245,240,230,0.16);
+      border-radius: 8px;
+      background: rgba(245,240,230,0.02);
+      cursor: crosshair;
+      opacity: 0;
+      transform: translateY(16px);
+      animation: msUp 0.9s ease 0.58s forwards;
+    }
+    .cj-caption {
+      font-size: 0.7rem;
+      letter-spacing: 0.18em;
+      color: rgba(232,224,208,0.4);
+      margin-bottom: 22px;
+      opacity: 0;
+      animation: msUp 0.9s ease 0.7s forwards;
+    }
+
+    .cj-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      opacity: 0;
+      transform: translateY(16px);
+      animation: msUp 0.9s ease 0.8s forwards;
+    }
+    .cj-btn {
+      padding: 12px 28px;
+      background: var(--gold);
+      border: 1px solid var(--gold);
+      color: #1a160e;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-indent: 0.18em;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: filter 0.3s ease, box-shadow 0.3s ease;
+    }
+    .cj-btn:hover { filter: brightness(1.12); box-shadow: 0 0 26px rgba(184,155,74,0.4); }
+    .cj-btn.ghost {
+      background: transparent;
+      border-color: rgba(245,240,230,0.28);
+      color: var(--paper-200);
+    }
+    .cj-btn.ghost:hover { color: var(--paper-100); border-color: rgba(245,240,230,0.55); box-shadow: none; }
+
+    .cj-close {
+      position: absolute;
+      top: 14px; right: 16px;
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      border: 1px solid rgba(245,240,230,0.18);
+      background: rgba(10, 9, 8, 0.5);
+      color: var(--paper-100);
+      font-size: 1.4rem;
+      line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 2;
+    }
+
+    .cj-result {
+      margin-top: 24px;
+      min-height: 10px;
+    }
+    .cj-seal {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 150px; height: 150px;
+      border: 3px solid var(--seal);
+      border-radius: 8px;
+      background: rgba(168,63,57,0.06);
+      color: var(--seal-light);
+      font-size: 3.4rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      box-shadow: 0 0 40px rgba(168,63,57,0.35), inset 0 0 24px rgba(168,63,57,0.18);
+      animation: sealStamp 0.7s cubic-bezier(0.22,1,0.36,1) both;
+      overflow: hidden;
+    }
+    .cj-seal img { width: 78%; height: 78%; object-fit: contain; }
+    @keyframes sealStamp {
+      0% { transform: scale(1.5) rotate(-8deg); opacity: 0; }
+      60% { transform: scale(0.94) rotate(2deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+    .cj-seal-name {
+      margin-top: 18px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      text-indent: 0.3em;
+      color: var(--paper-100);
+    }
+    .cj-seal-note {
+      margin-top: 8px;
+      font-size: 0.86rem;
+      letter-spacing: 0.1em;
+      color: rgba(232,224,208,0.62);
+    }
+
+    .cj-restart {
+      margin-top: 22px;
+      background: none;
+      border: none;
+      color: rgba(232,224,208,0.5);
+      font-family: inherit;
+      font-size: 0.78rem;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    @keyframes fadeDown { to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 560px) {
+      .ms-grid { grid-template-columns: repeat(2, 1fr); gap: 11px; }
+      .ms-tile .t-name { font-size: 1.4rem; }
+    }
+    @media (min-width: 768px) {
+      :root { --perspective: 1700px; }
+      header { padding-top: 38px; }
+      header h1 { font-size: 2.8rem; }
+      header p { font-size: 0.84rem; }
+      .detail-content { padding: 0 22px; }
+      .detail-content::before { font-size: 10rem; top: -108px; }
+      .detail-title { font-size: 3rem; }
+      .detail-desc { font-size: 1.08rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== Gallery ===== -->
+  <canvas id="starCanvas"></canvas>
+  <div class="stage-bg"></div>
+
+  <header>
+    <h1>字造集</h1>
+    <p>汉字构形美学 · 六书情绪画廊</p>
+  </header>
+
+  <main class="scene" id="scene">
+    <div class="cloud" id="cloud"></div>
+  </main>
+
+  <div class="drag-hint" id="dragHint">拖动漫游 · 双指缩放 · 点击聚焦</div>
+
+  <div class="detail-overlay" id="detailOverlay">
+    <div class="detail-panel" id="detailPanel">
+      <button class="close-btn" id="closeBtn" aria-label="关闭">×</button>
+      <div class="detail-content" id="detailContent"></div>
+      <button class="create-btn" id="createBtn">开始造字之旅 <span class="arrow">→</span></button>
+    </div>
+  </div>
+
+  <!-- ===== Mood-select screen (replaces 5-glyph intro) ===== -->
+  <div class="mood-select" id="moodSelect">
+    <div class="ms-inner">
+      <div class="ms-eyebrow">字 造 集</div>
+      <h2 class="ms-title">情绪，比语言更早抵达</h2>
+      <p class="ms-sub">世间许多感受，尚没有名字。<br>在字造集，为那份未名的情绪，造一个属于你的字。</p>
+      <div class="ms-grid" id="msGrid"></div>
+      <button class="ms-random" id="msRandom">随缘漫游</button>
+    </div>
+  </div>
+
+  <!-- ===== Opening gate (river bg + stars + glass cursor) ===== -->
+  <div class="opening" id="opening">
+    <div class="obg"></div>
+    <div class="oriver"></div>
+    <svg class="ocaustics" xmlns="http://www.w3.org/2000/svg">
+      <filter id="riverf">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.045" numOctaves="2" seed="7" result="n">
+          <animate attributeName="baseFrequency" dur="20s" values="0.012 0.045;0.02 0.065;0.012 0.045" repeatCount="indefinite"/>
+        </feTurbulence>
+        <feColorMatrix in="n" type="matrix"
+          values="0 0 0 0 0.78  0 0 0 0 0.66  0 0 0 0 0.40  0 0 0 0.55 0"/>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#riverf)"/>
+    </svg>
+    <canvas id="openingStars"></canvas>
+    <div class="oguide" id="guide">字</div>
+    <canvas id="canvas"></canvas>
+    <div class="oui">
+      <div class="otop">
+        <h1>字造集</h1>
+        <p>挥毫入境 · 以字为钥</p>
+      </div>
+      <div class="ohint" id="hint">以光标为笔，在虚空中书写「字」字，即可入字</div>
+    </div>
+    <div class="ocontrols">
+      <button id="clearBtn">重写</button>
+      <button id="enterBtn">入境</button>
+    </div>
+    <div class="osuccring" id="successRing"></div>
+    <div class="osucctext" id="successText">入字</div>
+  </div>
+
+  <!-- ===== Create-journey overlay ===== -->
+  <div class="create-journey" id="createJourney">
+    <div class="cj-inner">
+      <button class="cj-close" id="cjClose" aria-label="关闭">×</button>
+      <div class="cj-seed" id="cjSeed">为「安心」造一个字</div>
+      <p class="cj-sub">它来了，又说不清是什么。<br>为这份尚未命名的感受，落笔成字。</p>
+      <input class="cj-input" id="cjInput" maxlength="8" placeholder="为它取个名字（如：栖、晤、涣）" autocomplete="off">
+      <canvas class="cj-canvas" id="cjCanvas"></canvas>
+      <div class="cj-caption">在框中书空，画出你心中这个字的形状</div>
+      <div class="cj-actions">
+        <button class="cj-btn ghost" id="cjBack">返回画廊</button>
+        <button class="cj-btn" id="cjCommit">落成此字</button>
+      </div>
+      <div class="cj-result" id="cjResult"></div>
+    </div>
+  </div>
+
+  <script>
+  // ===================================================================
+  //  GALLERY  (3D infinite parallax cloud)
+  // ===================================================================
+  const items = [
+    { file: 'anxin.png',    title: '安心', pinyin: 'ān xīn',   tag: '会意 · 象形', desc: '“安”从女在宀下，屋下有女则安定，会意也；“心”象形，象心脏之形。屋宇庇护，女子安然，心得其所，是为安心。' },
+    { file: 'benshang.png', title: '悲伤', pinyin: 'bēi shāng', tag: '形声',       desc: '“悲”从心，非声，非本有违背、哀痛之意；“伤”从人，省声。非声入心，痛彻肝肠；人逢离别，悲从中来。' },
+    { file: 'fennu.png',    title: '愤怒', pinyin: 'fèn nù',    tag: '形声',       desc: '“愤”从心，贲声，气满胸臆；“怒”从心，奴声，心被压制而爆发。贲声激越，奴心难抑；怒火中烧，势不可遏。' },
+    { file: 'gudu.png',     title: '孤独', pinyin: 'gū dú',     tag: '形声',       desc: '“孤”从子，瓜声，幼而无父曰孤；“独”从犬，蜀声，一犬独行。孑然一身，瓜声如叹；独对长空，形影相吊。' },
+    { file: 'kongju.png',   title: '恐惧', pinyin: 'kǒng jù',   tag: '形声',       desc: '“恐”从心，巩声，心有畏巩；“惧”从心，瞿声，瞿然惊视。巩声颤心，瞿目四顾；幽林孤灯，惧由心生。' },
+    { file: 'qidai.png',    title: '期待', pinyin: 'qī dài',    tag: '形声',       desc: '“期”从月，其声，月满为期；“待”从彳，寺声，止而等候。月满其期，伫立以待；晨光初露，希望在前。' },
+    { file: 'xiyue.png',    title: '喜悦', pinyin: 'xǐ yuè',    tag: '会意 · 形声', desc: '“喜”从壴从口，鼓乐欢庆，会意也；“悦”从心，兑声。鼓乐张口，喜上眉梢；心悦神畅，如沐春风。' },
+    { file: 'zhenfen.png',  title: '振奋', pinyin: 'zhèn fèn',  tag: '形声 · 会意', desc: '“振”从手，辰声，振衣而起；“奋”从奞在田上，鸟奋翼欲飞。振衣云端，奋翼九霄；红旗猎猎，意气风发。' }
+  ];
+
+  const moodLines = {
+    '安心': '屋檐之下，心有所栖',
+    '悲伤': '雨落肩头，未曾说出口',
+    '愤怒': '胸中火起，烧断沉默',
+    '孤独': '人潮之中，自成孤岛',
+    '恐惧': '暗处有声，呼吸变轻',
+    '期待': '晨光未亮，已起身等候',
+    '喜悦': '风过眉梢，嘴角先笑',
+    '振奋': '振衣千仞，意气凌云'
+  };
+
+  const cloud = document.getElementById('cloud');
+  const scene = document.getElementById('scene');
+  const dragHint = document.getElementById('dragHint');
+  const detailOverlay = document.getElementById('detailOverlay');
+  const detailPanel = document.getElementById('detailPanel');
+  const detailContent = document.getElementById('detailContent');
+  const closeBtn = document.getElementById('closeBtn');
+  const createBtn = document.getElementById('createBtn');
+
+  const PERSPECTIVE = 1500;
+  const COPIES_PER_ITEM = 9;
+  const AUTO_SPEED = 0.16;
+  const INERTIA_DECAY = 0.93;
+  const PARALLAX_AMT = 80;
+  const FOCUS_NEAR = 540;
+  const HOVER_SCALE = 0.14;
+
+  let cards = [];
+  let camera = { x: 0, y: 0 };
+  let targetCamera = { x: 0, y: 0 };
+  let velX = 0, velY = 0;
+  let isDragging = false;
+  let lastPointer = { x: 0, y: 0 };
+  let dragDistance = 0;
+  let hintShown = false;
+
+  const pointers = new Map();
+  let isPinching = false;
+  let pinchPrevDist = 0;
+  let pinchPrevMid = { x: 0, y: 0 };
+  let viewScale = 1;
+  let targetViewScale = 1;
+
+  let parX = 0, parY = 0;
+  let parTX = 0, parTY = 0;
+
+  let focusedCard = null;
+
+  const t0 = performance.now();
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const midOf = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const depthFactor = (z) => PERSPECTIVE / (PERSPECTIVE - z);
+
+  function initGallery() {
+    createCards();
+    bindEvents();
+    requestAnimationFrame(animate);
+  }
+
+  function createCards() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const bands = [
+      { count: 1, zMin: 140,  zMax: 250,  sizeMin: 165, sizeMax: 220 },
+      { count: 2, zMin: -210, zMax: -30,  sizeMin: 112, sizeMax: 172 },
+      { count: 2, zMin: -580, zMax: -300, sizeMin: 70,  sizeMax: 116 },
+      { count: 4, zMin: -1090,zMax: -720, sizeMin: 40,  sizeMax: 76  }
+    ];
+
+    const spreadX = vw * 2.7;
+    const spreadY = vh * 2.05;
+
+    items.forEach((item) => {
+      bands.forEach((band) => {
+        for (let i = 0; i < band.count; i++) {
+          let x, y;
+          if (band.zMin > 0) {
+            let tries = 0;
+            do {
+              x = (Math.random() * 2 - 1) * spreadX * 0.7;
+              y = (Math.random() * 2 - 1) * spreadY * 0.7;
+              tries++;
+            } while (tries < 12 && cards.some(c => c.z > 0 && Math.hypot(c.x - x, c.y - y) < 360));
+          } else {
+            x = (Math.random() * 2 - 1) * spreadX;
+            y = (Math.random() * 2 - 1) * spreadY;
+          }
+
+          const z = band.zMin + Math.random() * (band.zMax - band.zMin);
+          const size = band.sizeMin + Math.random() * (band.sizeMax - band.sizeMin);
+          const w = size;
+          const h = size / 0.75;
+
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.style.width = w + 'px';
+          el.style.height = h + 'px';
+          el.style.marginLeft = (w / -2) + 'px';
+          el.style.marginTop = (h / -2) + 'px';
+          el.setAttribute('data-title', item.title);
+          el.innerHTML = `
+            <img src="${item.file}" alt="${item.title}" loading="lazy" draggable="false"
+                 onerror="this.parentNode.classList.add('img-missing')">
+            <div class="card-label">${item.title}</div>
+          `;
+
+          const labelEl = el.querySelector('.card-label');
+          const cardObj = {
+            el, labelEl,
+            x, y, z,
+            itemIndex: items.indexOf(item),
+            rot: (Math.random() - 0.5) * 9,
+            phase: Math.random() * Math.PI * 2,
+            bobAmp: 3 + Math.random() * 4,
+            rotAmp: 1 + Math.random() * 1.5,
+            hovered: false,
+            hoverT: 0,
+            focusActive: false,
+            focusAnimT: 0,
+            exiting: false,
+            baseW: w, baseH: h
+          };
+
+          el.addEventListener('click', () => {
+            if (dragDistance > 12) return;
+            enterFocus(cardObj);
+          });
+          el.addEventListener('mouseenter', () => { if (!focusedCard) cardObj.hovered = true; });
+          el.addEventListener('mouseleave', () => { cardObj.hovered = false; });
+
+          cloud.appendChild(el);
+          cards.push(cardObj);
+        }
+      });
+    });
+
+    if (!window.matchMedia('(hover: hover)').matches) {
+      document.body.classList.add('show-labels');
+    }
+  }
+
+  function bindEvents() {
+    scene.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    window.addEventListener('resize', () => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      cards.forEach(card => {
+        if (Math.abs(card.x) > vw * 4) card.x *= 0.5;
+        if (Math.abs(card.y) > vh * 3) card.y *= 0.5;
+      });
+    });
+
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); exitFocus(); });
+    detailOverlay.addEventListener('click', (e) => {
+      if (e.target === detailOverlay || e.target === detailPanel) exitFocus();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (createJourney.classList.contains('show')) closeCreate();
+        else if (focusedCard) exitFocus();
+      }
+    });
+
+    createBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (focusedCard) openCreate(items[focusedCard.itemIndex]);
+    });
+  }
+
+  function onPointerDown(e) {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1) {
+      isDragging = true;
+      dragDistance = 0;
+      lastPointer.x = e.clientX;
+      lastPointer.y = e.clientY;
+      velX = 0; velY = 0;
+      scene.setPointerCapture?.(e.pointerId);
+      showHint();
+    } else if (pointers.size === 2) {
+      isDragging = false;
+      isPinching = true;
+      const pts = [...pointers.values()];
+      pinchPrevDist = dist(pts[0], pts[1]);
+      pinchPrevMid = midOf(pts[0], pts[1]);
+      velX = 0; velY = 0;
+      showHint();
+    }
+  }
+
+  function onPointerMove(e) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    parTX = -(e.clientX / vw - 0.5) * PARALLAX_AMT;
+    parTY = -(e.clientY / vh - 0.5) * PARALLAX_AMT;
+
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (isPinching && pointers.size >= 2) {
+      e.preventDefault();
+      const pts = [...pointers.values()];
+      const d = dist(pts[0], pts[1]);
+      const m = midOf(pts[0], pts[1]);
+
+      if (pinchPrevDist > 0) {
+        targetViewScale = clamp(targetViewScale * (d / pinchPrevDist), 0.45, 3.2);
+      }
+      const mdx = m.x - pinchPrevMid.x;
+      const mdy = m.y - pinchPrevMid.y;
+      targetCamera.x -= mdx / viewScale;
+      targetCamera.y -= mdy / viewScale;
+      dragDistance += Math.hypot(mdx, mdy);
+
+      pinchPrevDist = d;
+      pinchPrevMid = m;
+      return;
+    }
+
+    if (isDragging) {
+      e.preventDefault();
+      const dx = e.clientX - lastPointer.x;
+      const dy = e.clientY - lastPointer.y;
+      lastPointer.x = e.clientX;
+      lastPointer.y = e.clientY;
+      dragDistance += Math.sqrt(dx * dx + dy * dy);
+
+      const rx = -dx * 1.1;
+      const ry = -dy * 1.1;
+      targetCamera.x += rx;
+      targetCamera.y += ry;
+      velX = rx; velY = ry;
+    }
+  }
+
+  function onPointerUp(e) {
+    pointers.delete(e.pointerId);
+
+    if (pointers.size < 2) {
+      isPinching = false;
+      pinchPrevDist = 0;
+    }
+
+    if (pointers.size === 0) {
+      isDragging = false;
+    } else if (pointers.size === 1) {
+      const [p] = [...pointers.values()];
+      lastPointer.x = p.x;
+      lastPointer.y = p.y;
+      isDragging = true;
+      dragDistance = 999;
+      velX = 0; velY = 0;
+    }
+  }
+
+  function showHint() {
+    if (hintShown) return;
+    hintShown = true;
+    dragHint.classList.add('show');
+    setTimeout(() => dragHint.classList.remove('show'), 4200);
+  }
+
+  function enterFocus(card) {
+    pointers.clear();
+    isPinching = false;
+    isDragging = false;
+    pinchPrevDist = 0;
+    dragDistance = 999;
+    velX = 0; velY = 0;
+
+    if (focusedCard && focusedCard !== card) {
+      focusedCard.exiting = true;
+      focusedCard.el.classList.remove('focused');
+    }
+
+    focusedCard = card;
+    card.hovered = false;
+    card.el.classList.remove('hovered');
+    card.focusActive = true;
+    card.exiting = false;
+    card.focusAnimT = 0;
+    card.el.classList.add('focused');
+    document.body.classList.add('focusing');
+
+    const item = items[card.itemIndex];
+    detailContent.setAttribute('data-char', item.title[0]);
+    detailContent.innerHTML = `
+      <div class="detail-pinyin">${item.pinyin}</div>
+      <h2 class="detail-title">${item.title}</h2>
+      <div class="detail-tag">${item.tag}</div>
+      <p class="detail-desc">${item.desc}</p>
+    `;
+    detailOverlay.classList.add('active');
+  }
+
+  function exitFocus() {
+    if (!focusedCard) return;
+    focusedCard.exiting = true;
+    focusedCard.el.classList.remove('focused');
+    detailOverlay.classList.remove('active');
+    document.body.classList.remove('focusing');
+    velX = 0; velY = 0;
+    focusedCard = null;
+  }
+
+  function updateCards(time) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const wrapX = vw * 4.4 * viewScale;
+    const wrapY = vh * 3.4 * viewScale;
+
+    const nearF = depthFactor(FOCUS_NEAR);
+    const farF = depthFactor(-1090);
+    const focusing = !!focusedCard;
+
+    cards.forEach(card => {
+      const f = depthFactor(card.z);
+      const depthNorm = Math.max(0, Math.min(1, (f - farF) / (nearF - farF)));
+
+      if (card.focusActive) {
+        const goal = card.exiting ? 0 : 1;
+        card.focusAnimT += (goal - card.focusAnimT) * 0.11;
+
+        if (card.exiting && card.focusAnimT < 0.02) {
+          card.focusAnimT = 0;
+          card.focusActive = false;
+          card.exiting = false;
+          card.el.style.zIndex = Math.round(1000 + card.z);
+          return;
+        }
+
+        const t = card.focusAnimT;
+        const basePx = (card.x - camera.x - parX) * f * viewScale;
+        const basePy = (card.y - camera.y - parY) * f * viewScale;
+        const baseScale = f * viewScale * (1 + 0.16 * depthNorm);
+        const focusScale = nearF * viewScale * 1.12;
+        const px = basePx * (1 - t);
+        const py = basePy * (1 - t);
+        const scale = baseScale + (focusScale - baseScale) * t;
+        const zEff = card.z + (FOCUS_NEAR - card.z) * t;
+
+        card.el.style.transform = `translate3d(${px}px, ${py}px, ${zEff}px) scale(${scale}) rotate(${card.rot * (1 - t)}deg)`;
+        card.el.style.opacity = 1;
+        card.el.style.filter = `blur(${7 * (1 - depthNorm) * (1 - t)}px) brightness(${0.5 + 0.5 * t})`;
+        card.el.style.zIndex = 3000;
+        return;
+      }
+
+      const bob = Math.sin(time * 0.0006 + card.phase) * card.bobAmp;
+      const rotWobble = Math.sin(time * 0.0004 + card.phase) * card.rotAmp;
+
+      let px = (card.x - camera.x) * f * viewScale;
+      let py = (card.y - camera.y) * f * viewScale + bob * f * viewScale;
+
+      if (px < -vw * 2.0) card.x += wrapX;
+      else if (px > vw * 2.0) card.x -= wrapX;
+      if (py < -vh * 1.6) card.y += wrapY;
+      else if (py > vh * 1.6) card.y -= wrapY;
+
+      px = (card.x - camera.x) * f * viewScale;
+      py = (card.y - camera.y) * f * viewScale + bob * f * viewScale;
+
+      px -= parX * f * viewScale;
+      py -= parY * f * viewScale;
+
+      card.hoverT += ((card.hovered ? 1 : 0) - card.hoverT) * 0.18;
+      const hov = card.hoverT;
+
+      let opacity = 0.1 + 0.9 * Math.pow(depthNorm, 0.6);
+      let blur = (1 - depthNorm) * 7;
+      let brightness = 0.3 + 0.7 * depthNorm;
+      let scale = f * viewScale * (1 + 0.16 * depthNorm);
+
+      scale *= 1 + HOVER_SCALE * hov;
+      brightness += 0.22 * hov;
+      opacity = Math.min(1, opacity + 0.08 * hov);
+
+      if (focusing) {
+        opacity = opacity * 0.5 + 0.05;
+        blur += 3.2;
+        brightness *= 0.72;
+      }
+
+      card.el.style.transform = `translate3d(${px}px, ${py}px, ${card.z}px) scale(${scale}) rotate(${card.rot + rotWobble}deg)`;
+      card.el.style.opacity = opacity;
+      card.el.style.filter = `blur(${blur}px) brightness(${brightness})`;
+      card.el.style.zIndex = Math.round(1000 + card.z + (hov > 0.3 ? 600 : 0));
+
+      if (hov > 0.05) card.el.classList.add('hovered');
+      else card.el.classList.remove('hovered');
+    });
+  }
+
+  function animate() {
+    const now = performance.now();
+    const time = now - t0;
+    const focusing = !!focusedCard;
+
+    if (!isDragging && !isPinching && !focusing) {
+      if (Math.abs(velX) > 0.02 || Math.abs(velY) > 0.02) {
+        targetCamera.x += velX;
+        targetCamera.y += velY;
+        velX *= INERTIA_DECAY;
+        velY *= INERTIA_DECAY;
+      } else {
+        velX = 0; velY = 0;
+        targetCamera.x += AUTO_SPEED;
+      }
+    }
+
+    const ptx = (isDragging || isPinching || focusing) ? 0 : parTX;
+    const pty = (isDragging || isPinching || focusing) ? 0 : parTY;
+    parX += (ptx - parX) * 0.06;
+    parY += (pty - parY) * 0.06;
+
+    camera.x += (targetCamera.x - camera.x) * 0.08;
+    camera.y += (targetCamera.y - camera.y) * 0.08;
+    viewScale += (targetViewScale - viewScale) * 0.15;
+
+    updateCards(time);
+    requestAnimationFrame(animate);
+  }
+
+  // ===================================================================
+  //  AMBIENT STARFIELD  (global + opening)
+  // ===================================================================
+  function makeStarField(canvas) {
+    const ctx = canvas.getContext('2d');
+    let w = 0, h = 0, dpr = 1;
+    let stars = [], streaks = [];
+
+    function resize() {
+      w = window.innerWidth; h = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.round((w * h) / 9000);
+      stars = [];
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * w, y: Math.random() * h,
+          r: Math.random() * 1.5 + 0.4,
+          a: Math.random() * 0.5 + 0.3,
+          ph: Math.random() * Math.PI * 2,
+          sp: Math.random() * 0.7 + 0.3,
+          dy: -(Math.random() * 7 + 2),
+          hue: Math.random() < 0.45 ? '201,168,86' : '245,240,230'
+        });
+      }
+      streaks = [];
+      const sc = Math.max(2, Math.round(count / 60));
+      for (let i = 0; i < sc; i++) {
+        streaks.push({
+          x: Math.random() * w, y: Math.random() * h,
+          len: Math.random() * 140 + 90,
+          ang: Math.PI * (0.62 + Math.random() * 0.16),
+          sp: Math.random() * 26 + 14,
+          a: Math.random() * 0.18 + 0.08,
+          ph: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function draw(t) {
+      ctx.clearRect(0, 0, w, h);
+      for (const s of stars) {
+        s.y += s.dy * 0.016;
+        if (s.y < -6) { s.y = h + 6; s.x = Math.random() * w; }
+        const tw = s.a * (0.45 + 0.55 * Math.sin(t * 0.001 * s.sp + s.ph));
+        const rr = s.r * 4;
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rr);
+        g.addColorStop(0, `rgba(${s.hue},${tw})`);
+        g.addColorStop(1, `rgba(${s.hue},0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(s.x, s.y, rr, 0, Math.PI * 2); ctx.fill();
+      }
+      for (const st of streaks) {
+        const dx = Math.cos(st.ang) * st.sp * 0.016;
+        const dy = Math.sin(st.ang) * st.sp * 0.016;
+        st.x += dx; st.y += dy;
+        if (st.x > w + st.len || st.y > h + st.len || st.x < -st.len) {
+          st.x = -st.len * Math.cos(st.ang); st.y = Math.random() * h * 0.5;
+        }
+        const ex = st.x + Math.cos(st.ang) * st.len;
+        const ey = st.y + Math.sin(st.ang) * st.len;
+        const tw = st.a * (0.5 + 0.5 * Math.sin(t * 0.0012 + st.ph));
+        const g = ctx.createLinearGradient(st.x, st.y, ex, ey);
+        g.addColorStop(0, `rgba(245,240,230,0)`);
+        g.addColorStop(0.5, `rgba(245,240,230,${tw})`);
+        g.addColorStop(1, `rgba(245,240,230,0)`);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+    }
+    return { resize, draw };
+  }
+
+  const globalStars = makeStarField(document.getElementById('starCanvas'));
+  const openingStars = makeStarField(document.getElementById('openingStars'));
+  globalStars.resize();
+  openingStars.resize();
+  window.addEventListener('resize', () => { globalStars.resize(); openingStars.resize(); });
+
+  function starLoop() {
+    const t = performance.now();
+    globalStars.draw(t);
+    if (!opening.classList.contains('done')) openingStars.draw(t);
+    requestAnimationFrame(starLoop);
+  }
+
+  // ===================================================================
+  //  MOOD-SELECT  (replaces the 5-glyph intro)
+  // ===================================================================
+  const moodSelect = document.getElementById('moodSelect');
+  const msGrid = document.getElementById('msGrid');
+  const msRandom = document.getElementById('msRandom');
+
+  function buildMoodGrid() {
+    msGrid.innerHTML = '';
+    items.forEach((item, i) => {
+      const tile = document.createElement('div');
+      tile.className = 'ms-tile';
+      tile.style.animationDelay = (0.6 + i * 0.07) + 's';
+      tile.innerHTML = `
+        <div class="t-glow"></div>
+        <div class="t-name">${item.title}</div>
+        <div class="t-line">${moodLines[item.title]}</div>
+      `;
+      tile.addEventListener('click', () => pickMood(i));
+      msGrid.appendChild(tile);
+    });
+  }
+
+  function showMoodSelect() {
+    moodSelect.classList.add('show');
+  }
+
+  function pickMood(i) {
+    if (!moodSelect.classList.contains('show')) return;
+    moodSelect.classList.remove('show');
+    showHint();
+    if (i >= 0) {
+      const card = cards.find(c => c.itemIndex === i);
+      if (card) setTimeout(() => enterFocus(card), 700);
+    }
+  }
+  msRandom.addEventListener('click', () => pickMood(-1));
+
+  // ===================================================================
+  //  CREATE-JOURNEY  (开始造字之旅)
+  // ===================================================================
+  const createJourney = document.getElementById('createJourney');
+  const cjSeed = document.getElementById('cjSeed');
+  const cjInput = document.getElementById('cjInput');
+  const cjCanvas = document.getElementById('cjCanvas');
+  const cjResult = document.getElementById('cjResult');
+  const cjClose = document.getElementById('cjClose');
+  const cjBack = document.getElementById('cjBack');
+  const cjCommit = document.getElementById('cjCommit');
+  const cjctx = cjCanvas.getContext('2d');
+
+  let cjSeedEmotion = '安心';
+  let cjStrokes = [];
+  let cjCurrent = null;
+  let cjTrail = [];
+  let cjPointer = { x: 0, y: 0 };
+  let cjIsDown = false;
+  let cjRunning = false;
+  let cjLastTx = 0, cjLastTy = 0;
+
+  function resizeCj() {
+    const r = cjCanvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cjCanvas.width = r.width * dpr;
+    cjCanvas.height = r.height * dpr;
+    cjctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function openCreate(item) {
+    cjSeedEmotion = item.title;
+    cjSeed.textContent = `为「${item.title}」造一个字`;
+    cjInput.value = '';
+    cjStrokes = [];
+    cjCurrent = null;
+    cjTrail = [];
+    cjResult.innerHTML = '';
+    createJourney.classList.add('show');
+    setTimeout(resizeCj, 60);
+    if (!cjRunning) { cjRunning = true; requestAnimationFrame(cjRender); }
+  }
+  function closeCreate() {
+    createJourney.classList.remove('show');
+    cjRunning = false;
+  }
+  cjClose.addEventListener('click', closeCreate);
+  cjBack.addEventListener('click', closeCreate);
+
+  function cjPos(e) {
+    const r = cjCanvas.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    return { x: cx, y: cy };
+  }
+  cjCanvas.addEventListener('pointerdown', (e) => {
+    cjIsDown = true;
+    const p = cjPos(e);
+    cjPointer = p;
+    cjCurrent = [p];
+    cjTrail.push({ x: p.x, y: p.y, age: 0, life: 22, r: 9 });
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!cjRunning || !cjIsDown) return;
+    const p = cjPos(e);
+    cjPointer = p;
+    if (cjCurrent) cjCurrent.push(p);
+    const dx = p.x - cjLastTx, dy = p.y - cjLastTy;
+    if (dx * dx + dy * dy > 4) {
+      cjTrail.push({ x: p.x, y: p.y, age: 0, life: 22, r: 9 });
+      cjLastTx = p.x; cjLastTy = p.y;
+    }
+  });
+  window.addEventListener('pointerup', () => {
+    if (!cjIsDown) return;
+    cjIsDown = false;
+    if (cjCurrent && cjCurrent.length > 4) cjStrokes.push(cjCurrent);
+    cjCurrent = null;
+  });
+
+  function cjRender() {
+    if (!cjRunning) return;
+    cjctx.clearRect(0, 0, cjCanvas.width, cjCanvas.height);
+    // glass disk
+    const px = cjPointer.x, py = cjPointer.y;
+    cjctx.save();
+    cjctx.globalCompositeOperation = 'screen';
+    const g = cjctx.createRadialGradient(px, py, 4, px, py, 30);
+    g.addColorStop(0, 'rgba(245,240,230,0.16)');
+    g.addColorStop(1, 'rgba(245,240,230,0)');
+    cjctx.fillStyle = g;
+    cjctx.beginPath(); cjctx.arc(px, py, 30, 0, Math.PI * 2); cjctx.fill();
+    cjctx.restore();
+    // trail
+    cjctx.save();
+    cjctx.lineCap = 'round'; cjctx.lineJoin = 'round';
+    for (let i = cjTrail.length - 1; i >= 0; i--) {
+      const p = cjTrail[i]; p.age++;
+      if (p.age >= p.life) { cjTrail.splice(i, 1); continue; }
+      const life = 1 - p.age / p.life;
+      cjctx.globalCompositeOperation = 'screen';
+      cjctx.fillStyle = `rgba(245,240,230,${0.18 * life})`;
+      cjctx.beginPath(); cjctx.arc(p.x, p.y, p.r * (0.4 + life), 0, Math.PI * 2); cjctx.fill();
+    }
+    cjctx.restore();
+    // ink
+    cjctx.save();
+    cjctx.lineCap = 'round'; cjctx.lineJoin = 'round';
+    cjctx.shadowBlur = 16; cjctx.shadowColor = 'rgba(201,168,86,0.5)';
+    const all = [...cjStrokes];
+    if (cjCurrent) all.push(cjCurrent);
+    for (const st of all) {
+      if (st.length < 2) continue;
+      cjctx.beginPath();
+      cjctx.moveTo(st[0].x, st[0].y);
+      for (let i = 1; i < st.length; i++) {
+        const p = st[i], prev = st[i - 1];
+        cjctx.quadraticCurveTo(prev.x, prev.y, (prev.x + p.x) / 2, (prev.y + p.y) / 2);
+      }
+      cjctx.lineTo(st[st.length - 1].x, st[st.length - 1].y);
+      cjctx.strokeStyle = 'rgba(245,240,230,0.9)';
+      cjctx.lineWidth = 2.6;
+      cjctx.stroke();
+    }
+    cjctx.restore();
+    requestAnimationFrame(cjRender);
+  }
+
+  cjCommit.addEventListener('click', () => {
+    const name = (cjInput.value || '').trim();
+    if (!name) {
+      cjInput.focus();
+      cjInput.style.borderColor = 'var(--seal-light)';
+      setTimeout(() => { cjInput.style.borderColor = ''; }, 1200);
+      return;
+    }
+    let sketch = '';
+    try {
+      if (cjStrokes.length > 0 && cjCanvas.width > 0) {
+        const url = cjCanvas.toDataURL('image/png');
+        if (url.length > 200) sketch = url;
+      }
+    } catch (err) { sketch = ''; }
+    const char = name.charAt(0);
+    cjResult.innerHTML = `
+      <div class="cj-seal">${sketch ? `<img src="${sketch}" alt="${char}">` : char}</div>
+      <div class="cj-seal-name">「${name}」</div>
+      <p class="cj-seal-note">此字，为「${cjSeedEmotion}」而生。</p>
+      <button class="cj-restart" id="cjRestart">再写一个</button>
+    `;
+    const restart = document.getElementById('cjRestart');
+    if (restart) restart.addEventListener('click', () => {
+      cjInput.value = ''; cjStrokes = []; cjCurrent = null; cjResult.innerHTML = '';
+      cjInput.focus();
+    });
+  });
+
+  // ===================================================================
+  //  OPENING GATE  (river bg + glass-cursor writing 字)
+  // ===================================================================
+  const opening = document.getElementById('opening');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  const guide = document.getElementById('guide');
+  const hint = document.getElementById('hint');
+  const successRing = document.getElementById('successRing');
+  const successText = document.getElementById('successText');
+
+  let W = window.innerWidth;
+  let H = window.innerHeight;
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const trail = [];
+  const TRAIL_LIFE = 28;
+  const TRAIL_INTERVAL = 2;
+  let lastTrailX = 0, lastTrailY = 0;
+  let pointer = { x: W / 2, y: H / 2 };
+  let isDown = false;
+  const strokes = [];
+  let currentStroke = null;
+
+  // 字 — normalized template (0..1 within char box). Cursive-friendly merged path.
+  const templateMerged = [
+    { x: 0.50, y: 0.10 }, { x: 0.50, y: 0.17 },
+    { x: 0.22, y: 0.27 }, { x: 0.50, y: 0.27 }, { x: 0.74, y: 0.35 },
+    { x: 0.34, y: 0.47 }, { x: 0.66, y: 0.47 }, { x: 0.60, y: 0.61 },
+    { x: 0.50, y: 0.47 }, { x: 0.50, y: 0.75 }, { x: 0.58, y: 0.70 },
+    { x: 0.30, y: 0.79 }, { x: 0.72, y: 0.79 }
+  ];
+
+  function charBox() {
+    const size = Math.min(W, H) * 0.55;
+    return { cx: W / 2, cy: H / 2, size, x0: W / 2 - size / 2, y0: H / 2 - size / 2 };
+  }
+  function normToScreen(pt) {
+    const b = charBox();
+    return { x: b.x0 + pt.x * b.size, y: b.y0 + pt.y * b.size };
+  }
+  function screenToNorm(pt) {
+    const b = charBox();
+    return { x: (pt.x - b.x0) / b.size, y: (pt.y - b.y0) / b.size };
+  }
+
+  function onDown(e) {
+    if (opening.classList.contains('done')) return;
+    isDown = true;
+    const p = getPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    currentStroke = [{ x: p.x, y: p.y, t: performance.now() }];
+    addTrail(p.x, p.y, true);
+  }
+  function onMove(e) {
+    const p = getPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    if (isDown && currentStroke) currentStroke.push({ x: p.x, y: p.y, t: performance.now() });
+    addTrail(p.x, p.y, false);
+  }
+  function onUp() {
+    if (!isDown) return;
+    isDown = false;
+    if (currentStroke && currentStroke.length > 4) {
+      strokes.push(currentStroke);
+      evaluate();
+    }
+    currentStroke = null;
+  }
+  function getPos(e) {
+    if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  canvas.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove, { passive: false });
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+  canvas.addEventListener('touchstart', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    strokes.length = 0;
+    currentStroke = null;
+    failCount = 0;
+    guide.classList.remove('glow');
+    hint.textContent = '以光标为笔，在虚空中书写「字」字，即可入字';
+    hint.style.color = 'rgba(245,240,230,0.5)';
+    enterBtn.classList.remove('show');
+  });
+
+  const enterBtn = document.getElementById('enterBtn');
+  enterBtn.addEventListener('click', () => {
+    if (!transitioned) { transitioned = true; dismissOpening(); }
+  });
+
+  function addTrail(x, y, force) {
+    if (!force) {
+      const dx = x - lastTrailX, dy = y - lastTrailY;
+      if (dx * dx + dy * dy < TRAIL_INTERVAL * TRAIL_INTERVAL) return;
+    }
+    lastTrailX = x; lastTrailY = y;
+    trail.push({ x, y, r: 10 + Math.random() * 4, age: 0, life: TRAIL_LIFE });
+  }
+
+  let failCount = 0;
+
+  function evaluate() {
+    if (strokes.length < 2) return;
+
+    let allPts = [];
+    let totalLen = 0;
+    for (const st of strokes) {
+      for (let i = 0; i < st.length; i++) {
+        allPts.push(st[i]);
+        if (i > 0) totalLen += Math.hypot(st[i].x - st[i - 1].x, st[i].y - st[i - 1].y);
+      }
+    }
+
+    const b = charBox();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of allPts) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    const w = maxX - minX, h = maxY - minY;
+    const aspect = w / Math.max(h, 1);
+    const ovX = Math.max(0, Math.min(maxX, b.x0 + b.size) - Math.max(minX, b.x0)) / Math.max(1, b.size);
+    const ovY = Math.max(0, Math.min(maxY, b.y0 + b.size) - Math.max(minY, b.y0)) / Math.max(1, b.size);
+    const coverage = ovX * ovY;
+
+    let topCount = 0, botCount = 0;
+    for (const p of allPts) {
+      const ny = (p.y - b.y0) / b.size;
+      if (ny < 0.42) topCount++;
+      else if (ny > 0.58) botCount++;
+    }
+    const n = allPts.length;
+    const topCover = topCount / n;
+    const botCover = botCount / n;
+
+    // Template similarity — merged path accepts both separated & cursive writing
+    const userMerged = resample(allPts, 64);
+    const tplMerged = resample(templateMerged.map(p => normToScreen(p)), 64);
+    const sim = strokeSimilarity(userMerged, tplMerged);
+
+    const lenOK = totalLen > b.size * 0.85;
+    const aspectOK = aspect > 0.5 && aspect < 1.9;
+    const regionOK = topCover > 0.12 && botCover > 0.12;
+    const covOK = coverage > 0.30;
+
+    const pass = sim > 0.66 && lenOK && aspectOK && regionOK && covOK && strokes.length >= 2;
+
+    if (pass) {
+      onSuccess();
+    } else {
+      failCount++;
+      guide.classList.remove('glow');
+      if (sim > 0.55) {
+        hint.textContent = '已近字形，再润一笔使之成「字」';
+      } else if (failCount >= 2) {
+        hint.innerHTML = '笔迹未成 · 可点右上「入境」直接进入';
+        enterBtn.classList.add('show');
+      } else {
+        hint.textContent = '笔迹未成，请依虚影再写一次「字」';
+      }
+      hint.style.color = 'rgba(200,160,120,0.85)';
+    }
+  }
+
+  function resample(pts, n) {
+    if (pts.length < 2) return pts;
+    const out = [pts[0]];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (total === 0) return pts;
+    const step = total / (n - 1);
+    let cur = 0;
+    let i = 1;
+    while (out.length < n && i < pts.length) {
+      const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      if (cur + d >= step) {
+        const t = (step - cur) / d;
+        out.push({ x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t });
+        pts.splice(i - 1, 1);
+        pts[i - 1] = out[out.length - 1];
+        cur = 0;
+      } else { cur += d; i++; }
+    }
+    while (out.length < n) out.push(pts[pts.length - 1]);
+    return out;
+  }
+
+  function strokeSimilarity(a, b) {
+    const na = normalizeStroke(a);
+    const nb = normalizeStroke(b);
+    let sum = 0;
+    for (let i = 0; i < na.length; i++) {
+      const dx = na[i].x - nb[i].x;
+      const dy = na[i].y - nb[i].y;
+      sum += Math.exp(-(dx * dx + dy * dy) * 4);
+    }
+    return sum / na.length;
+  }
+  function normalizeStroke(pts) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    const w = Math.max(maxX - minX, 0.001);
+    const h = Math.max(maxY - minY, 0.001);
+    const s = Math.max(w, h);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    return pts.map(p => ({ x: (p.x - cx) / s, y: (p.y - cy) / s }));
+  }
+
+  let transitioned = false;
+  function onSuccess() {
+    if (transitioned) return;
+    transitioned = true;
+    guide.classList.add('glow');
+    hint.textContent = '字已成，入境中…';
+    hint.style.color = 'var(--gold)';
+
+    canvas.removeEventListener('pointerdown', onDown);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+
+    successRing.classList.add('open');
+    successText.classList.add('show');
+
+    setTimeout(() => { dismissOpening(); }, 900);
+  }
+
+  // Reveal the 3D gallery in-place (no cross-file navigation)
+  function dismissOpening() {
+    opening.classList.add('done');
+    canvas.style.display = 'none';
+    setTimeout(() => { opening.style.display = 'none'; }, 1500);
+    showMoodSelect();
+  }
+
+  // ---------- Render loop for glass cursor + ink ----------
+  let renderRunning = true;
+  function render() {
+    if (!renderRunning) return;
+    ctx.clearRect(0, 0, W, H);
+    drawGlassDisk(pointer.x, pointer.y);
+
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i];
+      p.age++;
+      if (p.age >= p.life) { trail.splice(i, 1); continue; }
+    }
+    drawTrail();
+    drawInk();
+    if (opening.classList.contains('done')) { renderRunning = false; return; }
+    requestAnimationFrame(render);
+  }
+
+  function drawGlassDisk(x, y) {
+    const r = 34;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const g = ctx.createRadialGradient(x, y, r * 0.25, x, y, r);
+    g.addColorStop(0, 'rgba(245,240,230,0.18)');
+    g.addColorStop(0.5, 'rgba(245,240,230,0.06)');
+    g.addColorStop(1, 'rgba(245,240,230,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = 'blur(6px)';
+    const g2 = ctx.createRadialGradient(x, y, 0, x, y, r * 0.7);
+    g2.addColorStop(0, 'rgba(245,240,230,0.10)');
+    g2.addColorStop(1, 'rgba(245,240,230,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+
+  function drawTrail() {
+    if (trail.length < 2) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < trail.length - 1; i++) {
+      const a = trail[i], b = trail[i + 1];
+      const life = 1 - a.age / a.life;
+      const width = 2 + life * 10;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = `rgba(230, 220, 200, ${0.12 * life})`;
+      ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+      ctx.globalCompositeOperation = 'source-over';
+      const g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, width * 1.2);
+      g.addColorStop(0, `rgba(245,240,230,${0.22 * life})`);
+      g.addColorStop(1, 'rgba(245,240,230,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(a.x, a.y, width * 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawInk() {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = 'rgba(201, 168, 86, 0.55)';
+    const all = [...strokes];
+    if (currentStroke) all.push(currentStroke);
+    for (const stroke of all) {
+      if (stroke.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x, stroke[0].y);
+      for (let i = 1; i < stroke.length; i++) {
+        const p = stroke[i], prev = stroke[i - 1];
+        const mx = (prev.x + p.x) / 2, my = (prev.y + p.y) / 2;
+        ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
+      }
+      ctx.lineTo(stroke[stroke.length - 1].x, stroke[stroke.length - 1].y);
+      ctx.strokeStyle = 'rgba(245, 240, 230, 0.88)';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(201, 168, 86, 0.55)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ===================================================================
+  //  BOOT
+  // ===================================================================
+  buildMoodGrid();
+  initGallery();   // builds cards + runs gallery render loop (hidden behind opening)
+  render();        // runs glass-cursor drawing loop for the opening
+  requestAnimationFrame(starLoop);
+  </script>
+</body>
+</html>
