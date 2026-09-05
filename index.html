@@ -2,18 +2,135 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#f5f0e6">
-  <title>字造集 - 基于汉字构形美学与六书逻辑的汉字文化互动共创H5</title>
-  <meta name="description" content="如果今天让你造一个汉字，你会怎么造？《字造集》让你从汉字学习者变为共创者。">
-  <link rel="stylesheet" href="fonts/fonts.css">
+  <meta name="theme-color" content="#000000">
+  <title>字造集 · 汉字情绪画廊</title>
+  <meta name="description" content="有些情绪，曾经没有名字。《字造集》让你从汉字学习者变为共创者：选一份感受，为它造一个字。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/animate.css">
-  <link rel="stylesheet" href="css/style.css?v=20260827-09">
-  <link rel="stylesheet" href="css/enhance.css?v=20260830-01">
-  <link rel="stylesheet" href="css/emotion-fx.css?v=20260831-01">
+  <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="h5-mode">
+
+  <!-- ===== 开场 H5：情绪画廊 / 七步叙事 / 书写入场 / 造字之旅 ===== -->
+  <div id="h5-opening">
+
+  <!-- ===== Gallery ===== -->
+  <canvas id="starCanvas"></canvas>
+  <div class="stage-bg"></div>
+
+  <header>
+    <h1>字造集</h1>
+    <p>汉字构形美学 · 六书情绪画廊</p>
+    <div class="drag-hint" id="dragHint">拖动漫游 · 双指缩放 · 点击聚焦</div>
+  </header>
+
+  <main class="scene" id="scene">
+    <div class="cloud" id="cloud"></div>
+  </main>
+
+  <div class="detail-overlay" id="detailOverlay">
+    <canvas class="rain-canvas" id="rainCanvas"></canvas>
+    <div class="detail-panel" id="detailPanel">
+      <button class="close-btn" id="closeBtn" aria-label="关闭">×</button>
+      <div class="detail-content" id="detailContent"></div>
+      <button class="create-btn" id="createBtn">开始造字之旅 <span class="arrow">→</span></button>
+    </div>
+  </div>
+
+  <!-- ===== Narrative (7-step opening story — 动效优先) ===== -->
+  <div class="narrative" id="narrative">
+    <canvas class="narv-night" id="narvNight"></canvas>
+    <div class="narv-moon" id="narvMoon"></div>
+    <div class="narv-window" id="narvWindow"></div>
+    <div class="narv-strobe" id="narvStrobe"></div>
+    <div class="narv-lamp" id="narvLamp"></div>
+    <div class="narv-desk" id="narvDesk"></div>
+    <div class="narv-phone" id="narvPhone"><span class="narv-cursor" id="narvCursor"></span></div>
+    <div class="narv-feeling" id="narvFeeling"></div>
+    <div class="narv-vignette" id="narvVignette"></div>
+    <div class="narv-ghost" id="narvGhost"></div>
+    <div class="narv-bloom" id="narvBloom"></div>
+    <div class="narv-text" id="narvText"></div>
+    <canvas class="narv-oracle" id="narvOracle"></canvas>
+    <canvas class="narv-wipe" id="narvWipe"></canvas>
+    <canvas class="narv-glass" id="narvGlass"></canvas>
+    <canvas class="narv-motes" id="narvMotes"></canvas>
+    <div class="narv-sub" id="narvSub"></div>
+    <div class="narv-hint2" id="narvHint2"></div>
+    <button class="narv-sound" id="narvSound" type="button" aria-label="声音开关" title="声音：开启">
+      <img src="images/icons/sound-icon.svg" alt="声音">
+      <span class="slash"></span>
+    </button>
+    <button class="narv-skip" id="narvSkip" type="button" aria-label="跳过叙事" title="跳过开场">跳过</button>
+    <button class="narv-enter" id="narvEnter">今日，造一字</button>
+  </div>
+
+  <!-- ===== Opening gate (river bg + stars + glass cursor) ===== -->
+  <div class="opening" id="opening">
+    <div class="obg"></div>
+    <div class="oriver"></div>
+    <svg class="ocaustics" xmlns="http://www.w3.org/2000/svg">
+      <filter id="riverf" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.009 0.011" numOctaves="2" seed="7" result="n">
+          <animate attributeName="baseFrequency" dur="20s" values="0.009 0.011;0.013 0.016;0.009 0.011" repeatCount="indefinite"/>
+        </feTurbulence>
+        <feColorMatrix in="n" type="matrix"
+          values="0 0 0 0 0.78  0 0 0 0 0.66  0 0 0 0 0.40  0 0 0 0.38 0"/>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#riverf)"/>
+    </svg>
+    <canvas id="openingStars"></canvas>
+    <div class="oguide" id="guide">字</div>
+    <canvas id="canvas"></canvas>
+    <div class="oui">
+      <div class="otop">
+        <h1>字造集</h1>
+        <p>挥毫入境 · 以字为钥</p>
+      </div>
+      <div class="ohint" id="hint">以光标为笔，在虚空中书写「字」字，即可入字</div>
+    </div>
+    <div class="ocontrols">
+      <button id="clearBtn">重写</button>
+      <button id="enterBtn">入境</button>
+    </div>
+    <div class="osuccring" id="successRing"></div>
+    <div class="osucctext" id="successText">入字</div>
+  </div>
+
+  <!-- ===== Create-journey overlay ===== -->
+  <div class="create-journey" id="createJourney">
+    <div class="cj-inner">
+      <button class="cj-close" id="cjClose" aria-label="关闭">×</button>
+      <div class="cj-seed" id="cjSeed">为「安心」造一个字</div>
+      <p class="cj-sub">它来了，又说不清是什么。<br>为这份尚未命名的感受，落笔成字。</p>
+      <input class="cj-input" id="cjInput" maxlength="8" placeholder="为它取个名字（如：栖、晤、涣）" autocomplete="off">
+      <canvas class="cj-canvas" id="cjCanvas"></canvas>
+      <div class="cj-caption">在框中书空，画出你心中这个字的形状</div>
+      <div class="cj-actions">
+        <button class="cj-btn ghost border-glow" id="cjBack">返回画廊</button>
+        <button class="cj-btn border-glow" id="cjCommit">落成此字</button>
+      </div>
+      <div class="cj-result" id="cjResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== Scroll Mask transition (black-out → next page) ===== -->
+  <div id="scrollMask">
+    <div class="sm-inner">
+      <div class="sm-char" id="smChar">字</div>
+      <div class="sm-line">入 字 · 造 字</div>
+    </div>
+  </div>
+
+  
+  </div>
+
+  <!-- ===== 主程序：六书实验室 / 造字工坊 / 释义 / 海报 / 我的字造集 ===== -->
+
 
 <div id="app">
 
@@ -61,23 +178,23 @@
         <div>拖动时间轴，看太阳如何变成"日"。</div>
       </div>
       <div class="evolution-box">
-        <img id="sunImage" src="assets/images/sun-real.svg" class="sun-image">
+        <img id="sunImage" src="images/sun-real.svg" class="sun-image">
         <input id="timeline" type="range" min="0" max="3" step="1" value="0">
         <div class="timeline-label">
           <span class="active">
-            <img src="assets/images/sun-real.svg" class="stage-thumb">
+            <img src="images/sun-real.svg" class="stage-thumb">
             太阳<br><small>远古</small>
           </span>
           <span>
-            <img src="assets/images/sun-oracle.svg" class="stage-thumb">
+            <img src="images/sun-oracle.svg" class="stage-thumb">
             甲骨文<br><small>商代</small>
           </span>
           <span>
-            <img src="assets/images/sun-seal.svg" class="stage-thumb">
+            <img src="images/sun-seal.svg" class="stage-thumb">
             小篆<br><small>秦代</small>
           </span>
           <span>
-            <img src="assets/images/sun-day.svg" class="stage-thumb">
+            <img src="images/sun-day.svg" class="stage-thumb">
             日<br><small>今日</small>
           </span>
         </div>
@@ -198,7 +315,7 @@
   <div class="page" id="page-charcard" style="display:none;">
     <div class="charcard-container">
       <div class="charcard ancient-card">
-        <img class="forge-seal" src="assets/images/seal-zizaoji.png" alt="字造集印章" loading="lazy">
+        <img class="forge-seal" src="images/seal-zizaoji.png" alt="字造集印章" loading="lazy">
         <div class="charcard-header">
           <div class="charcard-brand">字造集</div>
           <div class="charcard-subtitle">我的造字</div>
@@ -231,7 +348,7 @@
           <div class="lanyard-clip" aria-hidden="true"></div>
           <div class="certify-card ancient-card" id="certify-card">
             <div class="certify-face certify-face-front">
-              <img class="forge-seal" src="assets/images/seal-zizaoji.png" alt="字造集印章">
+              <img class="forge-seal" src="images/seal-zizaoji.png" alt="字造集印章">
               <div class="certify-title">《字造集》造字资格证</div>
               <div class="certify-row"><span class="label">认证人</span><span class="value" id="certify-name">字造师</span></div>
               <div class="certify-row"><span class="label">类型</span><span class="value" id="certify-type">会意魔法师</span></div>
@@ -323,10 +440,18 @@
 
 </div>
 
-<script src="js/html2canvas.min.js"></script>
-<script src="js/main.js?v=20260827-09"></script>
-<link rel="stylesheet" href="js/components/XuanXuan/xuanxuan.css?v=20260827-09">
-<script src="js/components/XuanXuan/xuanxuan.js"></script>
-<script src="js/create-button-state.js"></script>
+
+
+
+
+
+
+
+  <script src="js/jquery.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/poster.generator.js"></script>
+  <script>
+    if (window.XuanXuan) { window.XuanXuan.setBase(''); }
+  </script>
 </body>
 </html>

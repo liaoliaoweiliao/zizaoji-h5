@@ -1,3 +1,2136 @@
+/* ============================================================
+   字造集 - main.js（最终版）
+   [0] 内联依赖：XuanXuan 墨灵 / create-button-state
+   [1] 开场 H5：情绪画廊 / 七步叙事 / 书写入场 / 造字之旅
+   [2] 主程序：六书实验室 / 能力值 / 造字工坊 / 释义 / 海报 / 我的字造集
+   [3] 桥接：开场结束 → 主程序
+   ============================================================ */
+
+/* ===== [0a] XuanXuan 墨灵角色（已内联） ===== */
+/* 玄玄 · 墨灵角色系统
+ * 跨文件复用：zizao.html（场景一 情绪字卡页）与 index.html（场景二~七）。
+ * 资源路径通过 setBase() 适配两个文件所在目录。
+ */
+window.XuanXuan = {
+  base: '',
+  _el: null,
+  _img: null,
+  _dialog: null,
+  _ink: null,
+
+  // 各情绪/动作对应的精灵图
+  POSES: {
+    peek: 'tantou.png',        // 探头
+    blink: 'zhayan.png',       // 眨眼
+    think: 'tuosaisikao.png',  // 托腮思考
+    tailQ: 'xiaoweibabianchengwenhao.png', // 小尾巴变问号
+    wood: 'bianchengmu.png',   // 变成木（树枝纹理）
+    fire: 'bianchenghuo.png',   // 变成火（头顶火苗）
+    scroll: 'xiaoshujuanjilu.png', // 拿小书卷记录
+    jump: 'tiaoqilai.png',      // 跳起来
+    cat: 'xueshimao.png',       // 雪狮猫（博士帽）
+    base: 'xuanxuan.png'        // 本体
+  },
+
+  // 页面 → 默认姿态
+  PAGE_POSE: {
+    zizao: 'peek', intro: 'peek', story: 'peek', lab: 'think',
+    workshop: 'tailQ', analysis: 'scroll', meaning: 'scroll',
+    charcard: 'jump', collection: 'cat'
+  },
+
+  // 页面默认台词（场景一特殊处理为三段）
+  PAGE_LINE: {
+    lab: '每一种心情，都在等待一个名字。',
+    workshop: '你的此刻，会诞生怎样的文字呢？',
+    analysis: '让我把这个字的故事记下来。',
+    meaning: '让我把这个字的故事记下来。',
+    charcard: '我把它记下来了！',
+    collection: '每一个字，都有属于自己的故事哦。'
+  },
+
+  setBase(p) { this.base = p || ''; },
+
+  init() {
+    if (this._el) return;
+    const d = document.createElement('div');
+    d.id = 'xuanxuan';
+    d.innerHTML =
+      '<img id="xuan-img" alt="玄玄" src="' + this.base + 'images/xuanxuan/' + this.POSES.base + '">' +
+      '<div class="xuan-dialog"></div>' +
+      '<div class="xuan-ink"></div>';
+    const host = document.getElementById('app') || document.body;
+    host.appendChild(d);
+    this._el = d;
+    this._img = d.querySelector('#xuan-img');
+    this._dialog = d.querySelector('.xuan-dialog');
+    this._ink = d.querySelector('.xuan-ink');
+  },
+
+  _imgFor(pose) {
+    return this.base + 'images/xuanxuan/' + (this.POSES[pose] || this.POSES.base);
+  },
+
+  pose(name) {
+    this.init();
+    this._img.src = this._imgFor(name);
+  },
+
+  say(text) {
+    this.init();
+    const box = this._dialog;
+    if (!text) { box.style.display = 'none'; return; }
+    box.innerHTML = text;
+    box.style.display = 'block';
+    box.classList.remove('xuan-bubble-in');
+    void box.offsetWidth; // 重启动画
+    box.classList.add('xuan-bubble-in');
+  },
+
+  hide() { if (this._el) this._el.style.display = 'none'; },
+
+  // 主入口：page 决定姿态/定位，text 覆盖默认台词
+  show(page, text) {
+    this.init();
+    const el = this._el;
+    el.className = 'xuan-' + page;
+    el.style.display = 'block';
+    el.classList.remove('xuan-jump', 'xuan-enter');
+    void el.offsetWidth;
+
+    // 造字人格、海报页面不显示玄玄
+    if (page === 'personality' || page === 'poster') { this.hide(); return; }
+
+    this.pose(this.PAGE_POSE[page] || 'peek');
+
+    // 入场（墨池探头 / 柔和浮入）
+    el.classList.add('xuan-enter');
+
+    if (page === 'zizao') { this._greetZizao(); return; }
+    if (page === 'charcard') {
+      el.classList.add('xuan-jump');
+      this.say(text || this.PAGE_LINE[page] || '');
+      return;
+    }
+    this.say(text || this.PAGE_LINE[page] || '');
+  },
+
+  // 场景一：情绪字卡页 · 墨池探头 → 眨眼 → 抖墨点 → 三段台词
+  _greetZizao() {
+    const lines = [
+      '你好，我是玄玄。',
+      '我是由千年文字孕育出的墨灵。',
+      '今天，你想创造一个怎样的字？'
+    ];
+    this.say(lines[0]);
+    setTimeout(() => { this.pose('blink'); }, 1100);
+    setTimeout(() => { this.pose('peek'); }, 1750);
+    setTimeout(() => { this._inkDots(); }, 1950);
+    setTimeout(() => { this.say(lines[1]); }, 2700);
+    setTimeout(() => { this.say(lines[2]); }, 4300);
+  },
+
+  // 抖落墨点粒子
+  _inkDots() {
+    if (!this._ink) return;
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'xuan-ink-dot';
+      const dx = (Math.random() * 2 - 1) * 30;
+      const dy = 18 + Math.random() * 34;
+      dot.style.setProperty('--dx', dx + 'px');
+      dot.style.setProperty('--dy', dy + 'px');
+      dot.style.animationDelay = (Math.random() * 0.3) + 's';
+      this._ink.appendChild(dot);
+      setTimeout(() => dot.remove(), 2000 + Math.random() * 300);
+    }
+  },
+
+  // 场景三：认识偏旁 · 木/火 变形
+  transform(componentId) {
+    if (componentId === 'tree' || componentId === 'wood') {
+      this.pose('wood');
+      this.say('木，代表生命与生长。');
+    } else if (componentId === 'fire') {
+      this.pose('fire');
+      this.say('火，代表光明与热烈。');
+    }
+  },
+
+  // 场景四：组合失败 · 安慰
+  comfort() {
+    this.pose('think');
+    this.say('咦？它还在等待另一半呢。');
+  },
+
+  // 场景六：字卡高潮 · 跳起来
+  jumpForJoy() {
+    this.pose('jump');
+    if (this._el) {
+      this._el.classList.remove('xuan-jump');
+      void this._el.offsetWidth;
+      this._el.classList.add('xuan-jump');
+    }
+    this.say('我把它记下来了！');
+  }
+};
+
+/* ===== [0b] 造字按钮状态机（已内联） ===== */
+
+let selectedParts=[];
+
+function selectPart(part){
+ if(!selectedParts.includes(part)){
+   selectedParts.push(part);
+ }
+ updateCreateButton();
+}
+
+function updateCreateButton(){
+ const btn=document.querySelector('#create-btn');
+ if(!btn)return;
+
+ const enough = selectedParts.length >= 2;
+
+ btn.disabled = !enough;
+
+ if(enough){
+   btn.classList.add('active');
+   btn.classList.remove('disabled');
+ }else{
+   btn.classList.remove('active');
+   btn.classList.add('disabled');
+ }
+}
+
+// 防止绕过按钮逻辑进入下一页
+function canCreate(){
+ return selectedParts.length >= 2;
+}
+
+
+/* ===== [1] 开场 H5 ===== */
+(function () {
+
+  // ===================================================================
+  //  GALLERY  (3D infinite parallax cloud)
+  // ===================================================================
+  const items = [
+    { file: 'images/moods/anxin.png',    title: '安心', pinyin: 'ān xīn',   tag: '会意 · 象形', desc: '“安”从女在宀下，屋下有女则安定，会意也；“心”象形，象心脏之形。屋宇庇护，女子安然，心得其所，是为安心。' },
+    { file: 'images/moods/benshang.png', title: '悲伤', pinyin: 'bēi shāng', tag: '形声',       desc: '“悲”从心，非声，非本有违背、哀痛之意；“伤”从人，省声。非声入心，痛彻肝肠；人逢离别，悲从中来。' },
+    { file: 'images/moods/fennu.png',    title: '愤怒', pinyin: 'fèn nù',    tag: '形声',       desc: '“愤”从心，贲声，气满胸臆；“怒”从心，奴声，心被压制而爆发。贲声激越，奴心难抑；怒火中烧，势不可遏。' },
+    { file: 'images/moods/gudu.png',     title: '孤独', pinyin: 'gū dú',     tag: '形声',       desc: '“孤”从子，瓜声，幼而无父曰孤；“独”从犬，蜀声，一犬独行。孑然一身，瓜声如叹；独对长空，形影相吊。' },
+    { file: 'images/moods/kongju.png',   title: '恐惧', pinyin: 'kǒng jù',   tag: '形声',       desc: '“恐”从心，巩声，心有畏巩；“惧”从心，瞿声，瞿然惊视。巩声颤心，瞿目四顾；幽林孤灯，惧由心生。' },
+    { file: 'images/moods/qidai.png',    title: '期待', pinyin: 'qī dài',    tag: '形声',       desc: '“期”从月，其声，月满为期；“待”从彳，寺声，止而等候。月满其期，伫立以待；晨光初露，希望在前。' },
+    { file: 'images/moods/xiyue.png',    title: '喜悦', pinyin: 'xǐ yuè',    tag: '会意 · 形声', desc: '“喜”从壴从口，鼓乐欢庆，会意也；“悦”从心，兑声。鼓乐张口，喜上眉梢；心悦神畅，如沐春风。' },
+    { file: 'images/moods/zhenfen.png',  title: '振奋', pinyin: 'zhèn fèn',  tag: '形声 · 会意', desc: '“振”从手，辰声，振衣而起；“奋”从奞在田上，鸟奋翼欲飞。振衣云端，奋翼九霄；红旗猎猎，意气风发。' }
+  ];
+
+  const moodLines = {
+    '安心': '屋檐之下，心有所栖',
+    '悲伤': '雨落肩头，未曾说出口',
+    '愤怒': '胸中火起，烧断沉默',
+    '孤独': '人潮之中，自成孤岛',
+    '恐惧': '暗处有声，呼吸变轻',
+    '期待': '晨光未亮，已起身等候',
+    '喜悦': '风过眉梢，嘴角先笑',
+    '振奋': '振衣千仞，意气凌云'
+  };
+
+  const cloud = document.getElementById('cloud');
+  const scene = document.getElementById('scene');
+  const dragHint = document.getElementById('dragHint');
+  const detailOverlay = document.getElementById('detailOverlay');
+  const detailPanel = document.getElementById('detailPanel');
+  const detailContent = document.getElementById('detailContent');
+  const closeBtn = document.getElementById('closeBtn');
+  const createBtn = document.getElementById('createBtn');
+
+  // ===== 悲伤情绪卡片：细雨滴下落动效（细、长、透明，整体极淡）=====
+  const rainCanvas = document.getElementById('rainCanvas');
+  const rctx = rainCanvas.getContext('2d');
+  let rainRAF = null;
+  const RainFX = (() => {
+    let drops = [], active = false, w = 0, h = 0;
+    function size() {
+      w = window.innerWidth; h = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      rainCanvas.width = Math.floor(w * dpr);
+      rainCanvas.height = Math.floor(h * dpr);
+      rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function spawn(init) {
+      const len = 14 + Math.random() * 26;       // 细而长
+      return {
+        x: Math.random() * w,
+        y: init ? Math.random() * h : -len - Math.random() * 40,
+        len,
+        speed: 4 + Math.random() * 5,            // 下落速度
+        slant: 1.2 + Math.random() * 1.0,        // 风斜
+        w: 0.8 + Math.random() * 0.6,            // 细
+        a: 0.05 + Math.random() * 0.10           // 透明
+      };
+    }
+    function makeDrops() {
+      const count = w < 640 ? 70 : 150;
+      drops = [];
+      for (let i = 0; i < count; i++) drops.push(spawn(true));
+    }
+    function frame() {
+      rctx.clearRect(0, 0, w, h);
+      rctx.lineCap = 'round';
+      for (const d of drops) {
+        rctx.strokeStyle = 'rgba(176,198,224,' + d.a + ')';
+        rctx.lineWidth = d.w;
+        rctx.beginPath();
+        rctx.moveTo(d.x, d.y);
+        rctx.lineTo(d.x + d.slant, d.y + d.len);
+        rctx.stroke();
+        d.y += d.speed;
+        d.x += d.slant * 0.15;
+        if (d.y > h + d.len) { d.y = -d.len - Math.random() * 30; d.x = Math.random() * w; }
+      }
+      rainRAF = requestAnimationFrame(frame);
+    }
+    return {
+      start() {
+        if (active) return;
+        active = true; size(); makeDrops();
+        rainCanvas.classList.add('on');
+        if (rainRAF) cancelAnimationFrame(rainRAF);
+        frame();
+      },
+      stop() {
+        active = false;
+        rainCanvas.classList.remove('on');
+        if (rainRAF) { cancelAnimationFrame(rainRAF); rainRAF = null; }
+        rctx.clearRect(0, 0, w, h);
+      },
+      resize() { if (active) size(); }
+    };
+  })();
+
+  const PERSPECTIVE = 1500;
+  const COPIES_PER_ITEM = 9;
+  const AUTO_SPEED = 0.16;
+  const INERTIA_DECAY = 0.93;
+  const PARALLAX_AMT = 80;
+  const FOCUS_NEAR = 540;
+  const HOVER_SCALE = 0.14;
+
+  let cards = [];
+  const cardEls = new Map();
+  let camera = { x: 0, y: 0 };
+  let targetCamera = { x: 0, y: 0 };
+  let velX = 0, velY = 0;
+  let isDragging = false;
+  let lastPointer = { x: 0, y: 0 };
+  let downX = 0, downY = 0;
+  let dragDistance = 0;
+  let downCardEl = null;
+  let didDrag = false;
+  let lastFocusTs = 0;
+  let hintShown = false;
+
+  const pointers = new Map();
+  let isPinching = false;
+  let pinchPrevDist = 0;
+  let pinchPrevMid = { x: 0, y: 0 };
+  let viewScale = 1;
+  let targetViewScale = 1;
+
+  let parX = 0, parY = 0;
+  let parTX = 0, parTY = 0;
+
+  let focusedCard = null;
+  let currentZikaItem = null;
+
+  const t0 = performance.now();
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const midOf = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const depthFactor = (z) => PERSPECTIVE / (PERSPECTIVE - z);
+
+  function initGallery() {
+    createCards();
+    bindEvents();
+    requestAnimationFrame(animate);
+  }
+
+  function createCards() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const bands = [
+      { count: 1, zMin: 140,  zMax: 250,  sizeMin: 165, sizeMax: 220 },
+      { count: 2, zMin: -210, zMax: -30,  sizeMin: 112, sizeMax: 172 },
+      { count: 2, zMin: -580, zMax: -300, sizeMin: 70,  sizeMax: 116 },
+      { count: 4, zMin: -1090,zMax: -720, sizeMin: 40,  sizeMax: 76  }
+    ];
+
+    const spreadX = vw * 2.7;
+    const spreadY = vh * 2.05;
+
+    items.forEach((item) => {
+      bands.forEach((band) => {
+        for (let i = 0; i < band.count; i++) {
+          let x, y;
+          if (band.zMin > 0) {
+            let tries = 0;
+            do {
+              x = (Math.random() * 2 - 1) * spreadX * 0.7;
+              y = (Math.random() * 2 - 1) * spreadY * 0.7;
+              tries++;
+            } while (tries < 12 && cards.some(c => c.z > 0 && Math.hypot(c.x - x, c.y - y) < 360));
+          } else {
+            x = (Math.random() * 2 - 1) * spreadX;
+            y = (Math.random() * 2 - 1) * spreadY;
+          }
+
+          const z = band.zMin + Math.random() * (band.zMax - band.zMin);
+          const size = band.sizeMin + Math.random() * (band.sizeMax - band.sizeMin);
+          const w = size;
+          const h = size / 0.75;
+
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.style.width = w + 'px';
+          el.style.height = h + 'px';
+          el.style.marginLeft = (w / -2) + 'px';
+          el.style.marginTop = (h / -2) + 'px';
+          el.setAttribute('data-title', item.title);
+          el.innerHTML = `
+            <img src="${item.file}" alt="${item.title}" loading="lazy" draggable="false"
+                 onerror="this.parentNode.classList.add('img-missing')">
+            <div class="card-label">${item.title}</div>
+          `;
+
+          const labelEl = el.querySelector('.card-label');
+          const cardObj = {
+            el, labelEl,
+            x, y, z,
+            itemIndex: items.indexOf(item),
+            rot: (Math.random() - 0.5) * 9,
+            phase: Math.random() * Math.PI * 2,
+            bobAmp: 3 + Math.random() * 4,
+            rotAmp: 1 + Math.random() * 1.5,
+            hovered: false,
+            hoverT: 0,
+            focusActive: false,
+            focusAnimT: 0,
+            exiting: false,
+            baseW: w, baseH: h
+          };
+
+          el.addEventListener('mouseenter', () => { if (!focusedCard) cardObj.hovered = true; });
+          el.addEventListener('mouseleave', () => { cardObj.hovered = false; });
+
+          cloud.appendChild(el);
+          cardEls.set(el, cardObj);
+          cards.push(cardObj);
+        }
+      });
+    });
+
+    if (!window.matchMedia('(hover: hover)').matches) {
+      document.body.classList.add('show-labels');
+    }
+  }
+
+  function bindEvents() {
+    scene.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    // 手机端兜底：触屏轻点（非拖拽）打开字卡。部分浏览器会吞掉 pointer 合成 click，这里双保险确保可靠触发。
+    scene.addEventListener('click', (e) => {
+      if (didDrag) return;
+      const cardEl = (e.target && e.target.closest) ? e.target.closest('.card') : null;
+      if (!cardEl) return;
+      tryFocusCard(cardEls.get(cardEl));
+    });
+
+    window.addEventListener('resize', () => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      cards.forEach(card => {
+        if (Math.abs(card.x) > vw * 4) card.x *= 0.5;
+        if (Math.abs(card.y) > vh * 3) card.y *= 0.5;
+      });
+      RainFX.resize();
+    });
+
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); exitFocus(); });
+    detailOverlay.addEventListener('click', (e) => {
+      // 刚打开字卡时，忽略由「点击卡片」产生的合成 click（此时遮罩已激活、命中遮罩自身），
+      // 否则字卡一打开就会被立刻关闭——这是手机/电脑端点击卡片后字卡不显示的根因
+      if (performance.now() - lastFocusTs < 450) return;
+      if (e.target === detailOverlay || e.target === detailPanel) exitFocus();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (createJourney.classList.contains('show')) closeCreate();
+        else if (detailOverlay.classList.contains('active')) exitFocus();
+      }
+    });
+
+    createBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentZikaItem) startScrollTransition(currentZikaItem);
+    });
+  }
+
+  function onPointerDown(e) {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1) {
+      isDragging = true;
+      dragDistance = 0;
+      didDrag = false;
+      lastPointer.x = e.clientX;
+      lastPointer.y = e.clientY;
+      downX = e.clientX;
+      downY = e.clientY;
+      velX = 0; velY = 0;
+      downCardEl = (e.target && e.target.closest) ? e.target.closest('.card') : null;
+      showHint();
+    } else if (pointers.size === 2) {
+      isDragging = false;
+      isPinching = true;
+      downCardEl = null;
+      const pts = [...pointers.values()];
+      pinchPrevDist = dist(pts[0], pts[1]);
+      pinchPrevMid = midOf(pts[0], pts[1]);
+      velX = 0; velY = 0;
+      showHint();
+    }
+  }
+
+  function onPointerMove(e) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    parTX = -(e.clientX / vw - 0.5) * PARALLAX_AMT;
+    parTY = -(e.clientY / vh - 0.5) * PARALLAX_AMT;
+
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (isPinching && pointers.size >= 2) {
+      e.preventDefault();
+      const pts = [...pointers.values()];
+      const d = dist(pts[0], pts[1]);
+      const m = midOf(pts[0], pts[1]);
+
+      if (pinchPrevDist > 0) {
+        targetViewScale = clamp(targetViewScale * (d / pinchPrevDist), 0.45, 3.2);
+      }
+      const mdx = m.x - pinchPrevMid.x;
+      const mdy = m.y - pinchPrevMid.y;
+      targetCamera.x -= mdx / viewScale;
+      targetCamera.y -= mdy / viewScale;
+      dragDistance += Math.hypot(mdx, mdy);
+      didDrag = true;
+
+      pinchPrevDist = d;
+      pinchPrevMid = m;
+      return;
+    }
+
+    if (isDragging) {
+      e.preventDefault();
+      const dx = e.clientX - lastPointer.x;
+      const dy = e.clientY - lastPointer.y;
+      lastPointer.x = e.clientX;
+      lastPointer.y = e.clientY;
+      dragDistance += Math.sqrt(dx * dx + dy * dy);
+      if (dragDistance > 12) didDrag = true;
+
+      const rx = -dx * 1.1;
+      const ry = -dy * 1.1;
+      targetCamera.x += rx;
+      targetCamera.y += ry;
+      velX = rx; velY = ry;
+    }
+  }
+
+  function onPointerUp(e) {
+    pointers.delete(e.pointerId);
+
+    if (pointers.size < 2) {
+      isPinching = false;
+      pinchPrevDist = 0;
+    }
+
+    if (pointers.size === 0) {
+      isDragging = false;
+      // 轻点（拖拽距离很小）落在某张卡片上 → 进入字卡焦点（桌面 / 手机一致）
+      if (downCardEl && dragDistance <= 30) {
+        tryFocusCard(cardEls.get(downCardEl));
+      }
+      downCardEl = null;
+    } else if (pointers.size === 1) {
+      const [p] = [...pointers.values()];
+      lastPointer.x = p.x;
+      lastPointer.y = p.y;
+      isDragging = true;
+      dragDistance = 999;
+      velX = 0; velY = 0;
+    }
+  }
+
+  function showHint() {
+    if (hintShown) return;
+    hintShown = true;
+    dragHint.classList.add('show');
+    setTimeout(() => dragHint.classList.remove('show'), 4200);
+  }
+
+  function tryFocusCard(obj) {
+    if (!obj) return;
+    const t = performance.now();
+    if (t - lastFocusTs < 350) return; // 防抖：pointerup 与合成 click 可能双双触发，避免重复进入焦点
+    lastFocusTs = t;
+    enterFocus(obj);
+  }
+
+  function enterFocus(card) {
+    pointers.clear();
+    isPinching = false;
+    isDragging = false;
+    pinchPrevDist = 0;
+    dragDistance = 999;
+    velX = 0; velY = 0;
+
+    if (focusedCard && focusedCard !== card) {
+      focusedCard.exiting = true;
+      focusedCard.el.classList.remove('focused');
+    }
+
+    focusedCard = card;
+    card.hovered = false;
+    card.el.classList.remove('hovered');
+    card.focusActive = true;
+    card.exiting = false;
+    card.focusAnimT = 0;
+    card.el.classList.add('focused');
+    document.body.classList.add('focusing');
+
+    const item = items[card.itemIndex];
+    currentZikaItem = item;
+    detailContent.setAttribute('data-char', item.title[0]);
+    detailContent.innerHTML = `
+      <div class="detail-image-card">
+        <img src="${item.file}" alt="${item.title}">
+        <div class="detail-image-text">
+          <div class="detail-pinyin">${item.pinyin}</div>
+          <h2 class="detail-title">${item.title}</h2>
+          <div class="detail-tag">${item.tag}</div>
+        </div>
+      </div>
+      <p class="detail-desc">${item.desc}</p>
+    `;
+    detailOverlay.classList.add('active');
+    // 悲伤情绪卡片：进入详情时落下细雨
+    if (item.file === 'images/moods/benshang.png') RainFX.start();
+    // 详情页不显示玄玄，避免遮挡文字和按钮
+    if (window.XuanXuan && window.XuanXuan._el) window.XuanXuan._el.style.display = 'none';
+  }
+
+  function exitFocus() {
+    detailOverlay.classList.remove('active');
+    RainFX.stop();
+    document.body.classList.remove('focusing');
+    if (focusedCard) {
+      focusedCard.exiting = true;
+      focusedCard.el.classList.remove('focused');
+      focusedCard = null;
+    }
+    currentZikaItem = null;
+    velX = 0; velY = 0;
+    // 返回画廊后重新显示玄玄（不重新触发入场台词）
+    if (window.XuanXuan && window.XuanXuan._el) window.XuanXuan._el.style.display = 'block';
+  }
+
+  function updateCards(time) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const wrapX = vw * 4.4 * viewScale;
+    const wrapY = vh * 3.4 * viewScale;
+
+    const nearF = depthFactor(FOCUS_NEAR);
+    const farF = depthFactor(-1090);
+    const focusing = !!focusedCard;
+
+    cards.forEach(card => {
+      const f = depthFactor(card.z);
+      const depthNorm = Math.max(0, Math.min(1, (f - farF) / (nearF - farF)));
+
+      if (card.focusActive) {
+        const goal = card.exiting ? 0 : 1;
+        card.focusAnimT += (goal - card.focusAnimT) * 0.11;
+
+        if (card.exiting && card.focusAnimT < 0.02) {
+          card.focusAnimT = 0;
+          card.focusActive = false;
+          card.exiting = false;
+          card.el.style.zIndex = Math.round(1000 + card.z);
+          return;
+        }
+
+        const t = card.focusAnimT;
+        const basePx = (card.x - camera.x - parX) * f * viewScale;
+        const basePy = (card.y - camera.y - parY) * f * viewScale;
+        const baseScale = f * viewScale * (1 + 0.16 * depthNorm);
+        const focusScale = nearF * viewScale * 1.12;
+        const px = basePx * (1 - t);
+        const py = basePy * (1 - t);
+        const scale = baseScale + (focusScale - baseScale) * t;
+        const zEff = card.z + (FOCUS_NEAR - card.z) * t;
+
+        card.el.style.transform = `translate3d(${px}px, ${py}px, ${zEff}px) scale(${scale}) rotate(${card.rot * (1 - t)}deg)`;
+        card.el.style.opacity = 1;
+        card.el.style.filter = `blur(${7 * (1 - depthNorm) * (1 - t)}px) brightness(${0.5 + 0.5 * t})`;
+        card.el.style.zIndex = 3000;
+        return;
+      }
+
+      const bob = Math.sin(time * 0.0006 + card.phase) * card.bobAmp;
+      const rotWobble = Math.sin(time * 0.0004 + card.phase) * card.rotAmp;
+
+      let px = (card.x - camera.x) * f * viewScale;
+      let py = (card.y - camera.y) * f * viewScale + bob * f * viewScale;
+
+      if (px < -vw * 2.0) card.x += wrapX;
+      else if (px > vw * 2.0) card.x -= wrapX;
+      if (py < -vh * 1.6) card.y += wrapY;
+      else if (py > vh * 1.6) card.y -= wrapY;
+
+      px = (card.x - camera.x) * f * viewScale;
+      py = (card.y - camera.y) * f * viewScale + bob * f * viewScale;
+
+      px -= parX * f * viewScale;
+      py -= parY * f * viewScale;
+
+      card.hoverT += ((card.hovered ? 1 : 0) - card.hoverT) * 0.18;
+      const hov = card.hoverT;
+
+      let opacity = 0.1 + 0.9 * Math.pow(depthNorm, 0.6);
+      let blur = (1 - depthNorm) * 7;
+      let brightness = 0.3 + 0.7 * depthNorm;
+      let scale = f * viewScale * (1 + 0.16 * depthNorm);
+
+      scale *= 1 + HOVER_SCALE * hov;
+      brightness += 0.22 * hov;
+      opacity = Math.min(1, opacity + 0.08 * hov);
+
+      if (focusing) {
+        opacity = opacity * 0.5 + 0.05;
+        blur += 3.2;
+        brightness *= 0.72;
+      }
+
+      card.el.style.transform = `translate3d(${px}px, ${py}px, ${card.z}px) scale(${scale}) rotate(${card.rot + rotWobble}deg)`;
+      card.el.style.opacity = opacity;
+      card.el.style.filter = `blur(${blur}px) brightness(${brightness})`;
+      card.el.style.zIndex = Math.round(1000 + card.z + (hov > 0.3 ? 600 : 0));
+
+      if (hov > 0.05) card.el.classList.add('hovered');
+      else card.el.classList.remove('hovered');
+    });
+  }
+
+  function animate() {
+    const now = performance.now();
+    const time = now - t0;
+    const focusing = !!focusedCard;
+
+    if (!isDragging && !isPinching && !focusing) {
+      if (Math.abs(velX) > 0.02 || Math.abs(velY) > 0.02) {
+        targetCamera.x += velX;
+        targetCamera.y += velY;
+        velX *= INERTIA_DECAY;
+        velY *= INERTIA_DECAY;
+      } else {
+        velX = 0; velY = 0;
+        targetCamera.x += AUTO_SPEED;
+      }
+    }
+
+    const ptx = (isDragging || isPinching || focusing) ? 0 : parTX;
+    const pty = (isDragging || isPinching || focusing) ? 0 : parTY;
+    parX += (ptx - parX) * 0.06;
+    parY += (pty - parY) * 0.06;
+
+    camera.x += (targetCamera.x - camera.x) * 0.08;
+    camera.y += (targetCamera.y - camera.y) * 0.08;
+    viewScale += (targetViewScale - viewScale) * 0.15;
+
+    updateCards(time);
+    requestAnimationFrame(animate);
+  }
+
+  // ===================================================================
+  //  AMBIENT STARFIELD  (global + opening)
+  // ===================================================================
+  function makeStarField(canvas) {
+    const ctx = canvas.getContext('2d');
+    let w = 0, h = 0, dpr = 1;
+    let stars = [], streaks = [];
+
+    function resize() {
+      w = window.innerWidth; h = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.round((w * h) / 9000);
+      stars = [];
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * w, y: Math.random() * h,
+          r: Math.random() * 1.5 + 0.4,
+          a: Math.random() * 0.5 + 0.3,
+          ph: Math.random() * Math.PI * 2,
+          sp: Math.random() * 0.7 + 0.3,
+          dy: -(Math.random() * 7 + 2),
+          hue: Math.random() < 0.45 ? '201,168,86' : '245,240,230'
+        });
+      }
+      streaks = [];
+      const sc = Math.max(2, Math.round(count / 60));
+      for (let i = 0; i < sc; i++) {
+        streaks.push({
+          x: Math.random() * w, y: Math.random() * h,
+          len: Math.random() * 140 + 90,
+          ang: Math.PI * (0.62 + Math.random() * 0.16),
+          sp: Math.random() * 26 + 14,
+          a: Math.random() * 0.18 + 0.08,
+          ph: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function draw(t) {
+      ctx.clearRect(0, 0, w, h);
+      for (const s of stars) {
+        s.y += s.dy * 0.016;
+        if (s.y < -6) { s.y = h + 6; s.x = Math.random() * w; }
+        const tw = s.a * (0.45 + 0.55 * Math.sin(t * 0.001 * s.sp + s.ph));
+        const rr = s.r * 4;
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rr);
+        g.addColorStop(0, `rgba(${s.hue},${tw})`);
+        g.addColorStop(1, `rgba(${s.hue},0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(s.x, s.y, rr, 0, Math.PI * 2); ctx.fill();
+      }
+      for (const st of streaks) {
+        const dx = Math.cos(st.ang) * st.sp * 0.016;
+        const dy = Math.sin(st.ang) * st.sp * 0.016;
+        st.x += dx; st.y += dy;
+        if (st.x > w + st.len || st.y > h + st.len || st.x < -st.len) {
+          st.x = -st.len * Math.cos(st.ang); st.y = Math.random() * h * 0.5;
+        }
+        const ex = st.x + Math.cos(st.ang) * st.len;
+        const ey = st.y + Math.sin(st.ang) * st.len;
+        const tw = st.a * (0.5 + 0.5 * Math.sin(t * 0.0012 + st.ph));
+        const g = ctx.createLinearGradient(st.x, st.y, ex, ey);
+        g.addColorStop(0, `rgba(245,240,230,0)`);
+        g.addColorStop(0.5, `rgba(245,240,230,${tw})`);
+        g.addColorStop(1, `rgba(245,240,230,0)`);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+    }
+    return { resize, draw };
+  }
+
+  const globalStars = makeStarField(document.getElementById('starCanvas'));
+  const openingStars = makeStarField(document.getElementById('openingStars'));
+  globalStars.resize();
+  openingStars.resize();
+  window.addEventListener('resize', () => { globalStars.resize(); openingStars.resize(); });
+
+  function starLoop() {
+    const t = performance.now();
+    globalStars.draw(t);
+    if (!opening.classList.contains('done')) openingStars.draw(t);
+    requestAnimationFrame(starLoop);
+  }
+
+  // ===================================================================
+  //  NARRATIVE  (7-step opening story: 夜晚·一盏灯下 → 一盏灯 → 无名情绪 → 未造之字 → 亲手造字)
+  // ===================================================================
+  const narrative = document.getElementById('narrative');
+  const narvStrobe = document.getElementById('narvStrobe');
+  const narvLamp = document.getElementById('narvLamp');
+  const narvDesk = document.getElementById('narvDesk');
+  const narvText = document.getElementById('narvText');
+  const narvOracle = document.getElementById('narvOracle');
+  const narvWipe = document.getElementById('narvWipe');
+  const narvGlass = document.getElementById('narvGlass');
+  const narvHint2 = document.getElementById('narvHint2');
+  const narvEnter = document.getElementById('narvEnter');
+  const narvMotes = document.getElementById('narvMotes');
+  const narvPhone = document.getElementById('narvPhone');
+  const narvNight = document.getElementById('narvNight');
+  const narvMoon = document.getElementById('narvMoon');
+  const narvWindow = document.getElementById('narvWindow');
+  const narvCursor = document.getElementById('narvCursor');
+  const narvFeeling = document.getElementById('narvFeeling');
+  const narvSub = document.getElementById('narvSub');
+  const narvBloom = document.getElementById('narvBloom');
+  const narvVignette = document.getElementById('narvVignette');
+  const narvGhost = document.getElementById('narvGhost');
+  const octx = narvOracle.getContext('2d');
+  const nmctx = narvMotes.getContext('2d');
+  const wctx = narvWipe.getContext('2d');
+  const gctx = narvGlass.getContext('2d');
+  const nctx = narvNight.getContext('2d');
+
+  let oW = 0, oH = 0, oDpr = 1;
+  let oracleGlyphs = [];
+  let oracleMode = 'idle';
+  let oracleT0 = 0;
+  let oracleRunning = false;
+  let glassTrail = [];
+  const ORACLE_CHARS = ['木','火','水','山','石','田','人','月','日','雨','风','心','川','泉','土','星'];
+
+  let skipRequested = false;
+  const wait = (ms) => new Promise(r => { if (skipRequested) return r(); setTimeout(r, ms); });
+
+  function resizeNarrative() {
+    oW = window.innerWidth; oH = window.innerHeight;
+    oDpr = Math.min(window.devicePixelRatio || 1, 2);
+    [narvOracle, narvWipe, narvGlass, narvMotes, narvNight].forEach(c => {
+      c.width = oW * oDpr; c.height = oH * oDpr;
+      c.style.width = oW + 'px'; c.style.height = oH + 'px';
+      c.getContext('2d').setTransform(oDpr, 0, 0, oDpr, 0, 0);
+    });
+    if (motesRAF) buildMotes();
+    if (nightRAF) buildStars();
+    if (oracleMode === 'scatter' || oracleMode === 'gather' || oracleMode === 'scatter2') {
+      wctx.clearRect(0, 0, oW, oH);
+      wctx.fillStyle = '#000'; wctx.fillRect(0, 0, oW, oH);
+    }
+  }
+
+  window.addEventListener('resize', resizeNarrative);
+
+  // ---- night sky: drifting starfield (step 00 动效优先) ----
+  let stars = [];
+  let shooting = null;
+  let nightRAF = 0;
+  function buildStars() {
+    // 夜空已按要求去除闪烁白星与流星，仅保留纯黑夜底与窗的静默
+    stars = [];
+    shooting = null;
+  }
+  function nightStep() {
+    nctx.clearRect(0, 0, oW, oH);
+    nightRAF = requestAnimationFrame(nightStep);
+  }
+  function startNight() {
+    if (nightRAF) return;
+    buildStars();
+    narvNight.classList.add('on');
+    nightRAF = requestAnimationFrame(nightStep);
+  }
+  function stopNight() {
+    if (nightRAF) { cancelAnimationFrame(nightRAF); nightRAF = 0; }
+    nctx.clearRect(0, 0, oW, oH);
+    narvNight.classList.remove('on');
+  }
+
+  // ---- faint subtitle whisper (文字退为极淡旁白，动效为主) ----
+  function showSub(str, gold) {
+    narvSub.textContent = str;
+    narvSub.className = 'narv-sub' + (gold ? ' gold' : '') + ' show';
+  }
+  function hideSub() {
+    narvSub.classList.remove('show');
+  }
+
+  // ---- center light burst (step 06 造字瞬间的一束光) ----
+  function flashBloom() {
+    narvBloom.classList.remove('flash');
+    void narvBloom.offsetWidth; // 强制重启动画
+    narvBloom.classList.add('flash');
+  }
+
+  // ---- phone typing: 虚拟打字机——反复输入又逐字删掉，表现犹豫迷茫（不知道用什么字）----
+  let phoneTypeTimer = 0;
+  function startPhoneTyping() {
+    const words = ['安心', '难过', '孤单', '开心', '害怕', '想说', '安宁', '委屈'];
+    const holder = document.createElement('span');
+    holder.className = 'narv-phone-type';
+    narvPhone.insertBefore(holder, narvCursor);
+    let wi = 0;
+    const typeWord = (word, next) => {
+      let i = 0;
+      const step = () => {
+        if (skipRequested || !narvPhone.classList.contains('on')) return;
+        holder.textContent = word.slice(0, ++i);
+        // 打字节奏不匀，带迟疑感
+        if (i < word.length) phoneTypeTimer = setTimeout(step, 300 + Math.random() * 180);
+        else phoneTypeTimer = setTimeout(next, 560);
+      };
+      step();
+    };
+    const eraseWord = (next) => {
+      const del = () => {
+        if (skipRequested || !narvPhone.classList.contains('on')) return;
+        holder.textContent = holder.textContent.slice(0, -1);
+        if (holder.textContent.length > 0) phoneTypeTimer = setTimeout(del, 150);
+        else phoneTypeTimer = setTimeout(next, 420); // 删空后停一瞬，像叹气，再换一个词
+      };
+      del();
+    };
+    const cycle = () => {
+      if (wi >= words.length) wi = 0; // 循环换词，直到用户轻触屏幕
+      const w = words[wi++];
+      typeWord(w, () => eraseWord(cycle));
+    };
+    cycle();
+  }
+  function stopPhoneTyping() {
+    clearTimeout(phoneTypeTimer);
+    narvPhone.querySelectorAll('.narv-phone-type').forEach(el => el.remove());
+  }
+
+
+  function buildStrobe() {
+    narvStrobe.innerHTML = '';
+    const glyphs = ['木','火','水','山','石','田','人','月','日','雨','风','心','川','泉','土','星','光','夜','墨','古'];
+    const N = 28;
+    for (let i = 0; i < N; i++) {
+      const g = document.createElement('div');
+      g.className = 'narv-glyph';
+      g.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+      g.style.left = (Math.random() * 100) + '%';
+      g.style.top = (Math.random() * 100) + '%';
+      g.style.fontSize = (1.6 + Math.random() * 2.4) + 'rem';
+      g.style.animationDelay = (Math.random() * 16) + 's';
+      g.style.animationDuration = (12 + Math.random() * 12) + 's';
+      narvStrobe.appendChild(g);
+    }
+  }
+
+  // ---- ambient warm motes (living, cozy particle field) ----
+  let motes = [];
+  let motesRAF = 0;
+  function buildMotes() {
+    const area = oW * oH;
+    const count = Math.max(30, Math.min(72, Math.round(area / 24000)));
+    motes = [];
+    for (let i = 0; i < count; i++) {
+      motes.push({
+        x: Math.random() * oW,
+        y: Math.random() * oH,
+        r: 0.6 + Math.random() * 1.9,
+        vy: -(0.05 + Math.random() * 0.22),
+        sway: 4 + Math.random() * 10,
+        ph: Math.random() * Math.PI * 2,
+        sp: 0.4 + Math.random() * 0.9,
+        a: 0.22 + Math.random() * 0.5,
+        tw: 0.5 + Math.random() * 1.4
+      });
+    }
+  }
+  function motesStep(t) {
+    nmctx.clearRect(0, 0, oW, oH);
+    nmctx.globalCompositeOperation = 'screen';
+    for (const m of motes) {
+      m.y += m.vy;
+      m.ph += 0.01 * m.sp;
+      const x = m.x + Math.sin(m.ph) * m.sway;
+      if (m.y < -12) { m.y = oH + 12; m.x = Math.random() * oW; }
+      const tw = 0.55 + 0.45 * Math.sin(t * 0.001 * m.tw + m.ph);
+      const alpha = m.a * tw;
+      const rad = m.r * 6;
+      const g = nmctx.createRadialGradient(x, m.y, 0, x, m.y, rad);
+      g.addColorStop(0, 'rgba(255,210,150,' + alpha.toFixed(3) + ')');
+      g.addColorStop(0.4, 'rgba(255,182,112,' + (alpha * 0.5).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,170,90,0)');
+      nmctx.fillStyle = g;
+      nmctx.beginPath(); nmctx.arc(x, m.y, rad, 0, Math.PI * 2); nmctx.fill();
+    }
+    nmctx.globalCompositeOperation = 'source-over';
+    motesRAF = requestAnimationFrame(motesStep);
+  }
+  function startMotes() {
+    if (motesRAF) return;
+    buildMotes();
+    narvMotes.classList.add('on');
+    motesRAF = requestAnimationFrame(motesStep);
+  }
+  function stopMotes() {
+    if (motesRAF) { cancelAnimationFrame(motesRAF); motesRAF = 0; }
+    if (nmctx) nmctx.clearRect(0, 0, oW, oH);
+    narvMotes.classList.remove('on');
+  }
+
+  function setText(str, opts = {}) {
+    return new Promise(resolve => {
+      if (skipRequested) return resolve();
+      narvText.className = 'narv-text' + (opts.serif ? ' serif' : '') + (opts.gold ? ' gold' : '');
+      narvText.innerHTML = '';
+      const chars = [...str];
+      chars.forEach((c, i) => {
+        const span = document.createElement('span');
+        span.className = 'ch' + (opts.brush ? ' brush' : '');
+        span.textContent = (c === ' ') ? ' ' : c;
+        span.style.animationDelay = (i * 0.12) + 's';
+        narvText.appendChild(span);
+      });
+      const total = chars.length * 120 + 1100;
+      setTimeout(resolve, total);
+    });
+  }
+
+  function clearText() {
+    narvText.innerHTML = '';
+    narvText.className = 'narv-text';
+  }
+
+  function dissolveWords() {
+    const spans = narvText.querySelectorAll('.ch');
+    [9, 10, 11, 12].forEach((i, k) => {
+      const s = spans[i];
+      if (!s) return;
+      // like ink washed apart by water: each char drifts a random direction while blurring
+      const dx = (k % 2 === 0 ? -1 : 1) * (22 + Math.random() * 36);
+      const dy = (Math.random() * 46 - 10);
+      s.style.setProperty('--dx', dx.toFixed(1) + 'px');
+      s.style.setProperty('--dy', dy.toFixed(1) + 'px');
+      s.classList.add('dissolve');
+    });
+  }
+
+  function spawnFragments() {
+    const fragChars = ['𠂉','𠀀','𠃍','𠄌','𠁝','乂','冂','勹','𠂇'];
+    const positions = [[-130,-40],[130,-30],[-160,60],[160,70],[-95,120],[105,130],[0,-140]];
+    positions.forEach((p, i) => {
+      const f = document.createElement('div');
+      f.className = 'narv-frag';
+      f.textContent = fragChars[i % fragChars.length];
+      // --tx/--ty：朝画面中心(0,0)收拢的方向，制造「欲聚又散」的呼吸感
+      f.style.setProperty('--tx', (-p[0] * 0.32).toFixed(1) + 'px');
+      f.style.setProperty('--ty', (-p[1] * 0.32).toFixed(1) + 'px');
+      f.style.left = `calc(50% + ${p[0]}px)`;
+      f.style.top = `calc(42% + ${p[1]}px)`;
+      f.style.animationDelay = (i * 1.4) + 's';
+      narrative.appendChild(f);
+    });
+  }
+  function clearFragments() {
+    document.querySelectorAll('.narv-frag').forEach(f => f.remove());
+  }
+
+  // 「名」反复想成形却碎散：动效本身即「有些情绪，曾经没有名字」
+  function playGhostName(times) {
+    narvGhost.textContent = '名';
+    let played = 0;
+    const run = () => {
+      narvGhost.classList.remove('try');
+      void narvGhost.offsetWidth; // 强制回流以重启动画
+      narvGhost.classList.add('try');
+      played++;
+      if (played < (times || 1)) narvGhost.addEventListener('animationend', run, { once: true });
+    };
+    run();
+  }
+  function clearGhost() {
+    narvGhost.classList.remove('try');
+    narvGhost.textContent = '';
+    narvGhost.style.opacity = '0';
+  }
+
+  function ripple(x, y) {
+    const r = document.createElement('div');
+    r.className = 'narv-ripple';
+    r.style.left = x + 'px';
+    r.style.top = y + 'px';
+    narrative.appendChild(r);
+    setTimeout(() => r.remove(), 1200);
+  }
+
+  function waitFirstTouch() {
+    return new Promise(resolve => {
+      if (skipRequested) return resolve({ x: oW / 2, y: oH / 2 });
+      const h = (e) => {
+        narrative.removeEventListener('pointerdown', h);
+        resolve({ x: e.clientX, y: e.clientY });
+      };
+      narrative.addEventListener('pointerdown', h, { once: true });
+    });
+  }
+
+  function pushGlass(x, y) {
+    glassTrail.push({ x, y, age: 0, life: 24, r: 12 });
+  }
+  function drawGlassTrail(ctx) {
+    for (let i = glassTrail.length - 1; i >= 0; i--) {
+      const p = glassTrail[i]; p.age++;
+      if (p.age >= p.life) { glassTrail.splice(i, 1); continue; }
+    }
+    if (!glassTrail.length) return;
+    const last = glassTrail[glassTrail.length - 1];
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const g = ctx.createRadialGradient(last.x, last.y, 6, last.x, last.y, 34);
+    g.addColorStop(0, 'rgba(245,240,230,0.20)');
+    g.addColorStop(1, 'rgba(245,240,230,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(last.x, last.y, 34, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.lineCap = 'round';
+    for (let i = 0; i < glassTrail.length - 1; i++) {
+      const a = glassTrail[i], b = glassTrail[i + 1];
+      const life = 1 - a.age / a.life;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = `rgba(230,220,200,${0.12 * life})`;
+      ctx.lineWidth = 2 + life * 8;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function wipeAt(x, y, r) {
+    wctx.save();
+    wctx.globalCompositeOperation = 'destination-out';
+    const g = wctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    wctx.fillStyle = g;
+    wctx.beginPath(); wctx.arc(x, y, r, 0, Math.PI * 2); wctx.fill();
+    wctx.restore();
+  }
+
+  function enableWipe() {
+    return new Promise(resolve => {
+      if (skipRequested) return resolve();
+      let resolved = false, erased = 0, lastPt = null;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        narvWipe.removeEventListener('pointerdown', down);
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        wctx.clearRect(0, 0, oW, oH); // fully reveal
+        resolve();
+      };
+      const down = (e) => { lastPt = { x: e.clientX, y: e.clientY }; wipeAt(lastPt.x, lastPt.y, 42); };
+      const move = (e) => {
+        if (!lastPt) lastPt = { x: e.clientX, y: e.clientY };
+        wipeAt(e.clientX, e.clientY, 44);
+        pushGlass(e.clientX, e.clientY);
+        lastPt = { x: e.clientX, y: e.clientY };
+        erased++;
+        if (erased > 36) finish();
+      };
+      const up = () => { if (erased > 8) finish(); };
+      narvWipe.addEventListener('pointerdown', down);
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      setTimeout(finish, 7000); // fallback: auto-reveal if no interaction
+    });
+  }
+
+  // ---- 预加载弘磊板书：canvas 不会自动触发 @font-face 下载，需显式 load ----
+  // 「字」字形已内嵌为 data URI（860B），毫秒级就绪；外部完整字体仅作回退
+  let banshuPreload = null;
+  function preloadBanshu() {
+    if (banshuPreload) return banshuPreload;
+    try {
+      if (document.fonts && document.fonts.load) {
+        banshuPreload = document.fonts.load("700 240px 'Honglei-Banshu'", '字').catch(() => {});
+      } else {
+        banshuPreload = Promise.resolve();
+      }
+    } catch (e) { banshuPreload = Promise.resolve(); }
+    return banshuPreload;
+  }
+  function banshuReady(timeout) {
+    return Promise.race([preloadBanshu(), new Promise(r => setTimeout(r, timeout || 2500))]);
+  }
+
+  function startOracle() {
+    oracleGlyphs = [];
+    const n = 14;
+    for (let i = 0; i < n; i++) {
+      const sx = oW * (0.18 + Math.random() * 0.64);
+      const sy = oH * (0.18 + Math.random() * 0.64);
+      oracleGlyphs.push({
+        ch: ORACLE_CHARS[i % ORACLE_CHARS.length],
+        sx, sy, x: sx, y: sy,
+        size: 40 + Math.random() * 44,
+        rot: (Math.random() - 0.5) * 0.5,
+        ang: Math.atan2(sy - oH / 2, sx - oW / 2),
+        dist: Math.hypot(sx - oW / 2, sy - oH / 2),
+        alpha: 1
+      });
+    }
+    wctx.clearRect(0, 0, oW, oH);
+    wctx.fillStyle = '#000'; wctx.fillRect(0, 0, oW, oH);
+    gctx.clearRect(0, 0, oW, oH);
+    oracleMode = 'scatter';
+    oracleT0 = performance.now();
+    if (!oracleRunning) { oracleRunning = true; requestAnimationFrame(oracleLoop); }
+  }
+
+  function oracleLoop() {
+    if (oracleMode === 'idle') { oracleRunning = false; return; }
+    const now = performance.now();
+    const t = (now - oracleT0) / 1000;
+
+    octx.clearRect(0, 0, oW, oH);
+    for (const g of oracleGlyphs) {
+      let x = g.x, y = g.y, a = g.alpha;
+      if (oracleMode === 'gather') {
+        const p = Math.min(1, (now - oracleT0) / 1400);
+        const e = 1 - Math.pow(1 - p, 3);
+        x = g.sx + (oW / 2 - g.sx) * e;
+        y = g.sy + (oH / 2 - g.sy) * e;
+        a = Math.max(0, 1 - p * 0.55);
+      } else if (oracleMode === 'scatter2') {
+        const p = Math.min(1, (now - oracleT0) / 1400);
+        const dx = g.sx - oW / 2, dy = g.sy - oH / 2;
+        x = oW / 2 + dx * (1 + p * 3);
+        y = oH / 2 + dy * (1 + p * 3);
+        a = Math.max(0, 1 - p);
+      }
+      octx.save();
+      octx.globalAlpha = a;
+      octx.fillStyle = '#c9a85a';
+      octx.shadowBlur = 18; octx.shadowColor = 'rgba(201,168,86,0.6)';
+      octx.font = `700 ${g.size}px 'Songti SC','STSong','SimSun',serif`;
+      octx.textAlign = 'center'; octx.textBaseline = 'middle';
+      octx.translate(x, y); octx.rotate(g.rot);
+      octx.fillText(g.ch, 0, 0);
+      octx.restore();
+    }
+    if (oracleMode === 'gather' && t > 1.4) {
+      octx.save();
+      octx.globalAlpha = Math.min(1, (t - 1.4) / 0.6);
+      octx.fillStyle = '#e8d9a8';
+      octx.shadowBlur = 40; octx.shadowColor = 'rgba(201,168,86,0.8)';
+      // 弘磊板书：古字汇聚成的那个「字」，用书法感更强的板书体（未加载完时回退宋体）
+      octx.font = `700 ${Math.min(oW, oH) * 0.28}px 'Honglei-Banshu','Songti SC','STSong','SimSun',serif`;
+      octx.textAlign = 'center'; octx.textBaseline = 'middle';
+      octx.fillText('字', oW / 2, oH / 2);
+      octx.restore();
+    }
+
+    gctx.clearRect(0, 0, oW, oH);
+    if (oracleMode === 'scatter') drawGlassTrail(gctx);
+
+    requestAnimationFrame(oracleLoop);
+  }
+
+  function gatherWord() {
+    return new Promise(resolve => {
+      if (skipRequested) { oracleMode = 'idle'; gctx.clearRect(0, 0, oW, oH); return resolve(); }
+      oracleMode = 'gather';
+      oracleT0 = performance.now();
+      setTimeout(() => {
+        oracleMode = 'scatter2';
+        oracleT0 = performance.now();
+        setTimeout(() => {
+          oracleMode = 'idle';
+          gctx.clearRect(0, 0, oW, oH);
+          resolve();
+        }, 1500);
+      }, 2400);
+    });
+  }
+
+  function revealGallery() {
+    narvEnter.classList.remove('show');
+    if (narvSkip) narvSkip.classList.remove('show');
+    stopMotes();
+    stopNight();
+    stopPhoneTyping();
+    narvPhone.classList.remove('on');
+    narvCursor.classList.remove('on');
+    narvFeeling.classList.remove('on', 'condense');
+    narvMoon.classList.remove('on');
+    narvWindow.classList.remove('on');
+    narvVignette.classList.remove('on');
+    clearGhost();
+    narvBloom.classList.remove('flash');
+    narvLamp.classList.remove('on');
+    narvStrobe.classList.remove('on');
+    narvDesk.classList.remove('on');
+    hideSub();
+    clearText();
+    clearFragments();
+    narrative.classList.add('done');
+    // 进入情绪长廊（3D 漂浮画廊）后背景音乐继续播放，不中断
+    if (narvBgm && !window.__zizaojiMuted && narvBgm.paused) {
+      narvBgm.play().catch(() => {});
+    }
+    setTimeout(() => { narrative.style.display = 'none'; }, 1500);
+    showHint();
+    // 场景一：玄玄从墨池探头、眨眼、抖墨点，并自我介绍
+    if (window.XuanXuan) window.XuanXuan.show('zizao');
+  }
+  narvEnter.addEventListener('click', revealGallery);
+
+  // ===== 6-step narrative sound toggle (右上角声音按钮) =====
+  const narvSound = document.getElementById('narvSound');
+  const narvBgm = new Audio('media/bgm/home-guqin.mp3');
+  narvBgm.loop = true;
+  narvBgm.volume = 0.6;
+  // 暴露到全局，供开场外的 enterMainApp() 在跳转主程序时停止开场 BGM（否则作用域隔离导致无法暂停）
+  window.narvBgm = narvBgm;
+  if (narvSound) {
+    // 初始化：开场页声音按钮默认「开启」，与主程序（背景音乐 + 音效）共用同一静音状态
+    const initialMuted = narvSound.classList.contains('muted');
+    window.__zizaojiMuted = initialMuted;
+    try { localStorage.setItem('zizaoji_music_muted', initialMuted ? '1' : '0'); } catch (e) {}
+
+    // 浏览器自动播放策略：需用户手势后才能播放。首次交互（进入字造集/点击等）即解锁并播放首页 BGM。
+    let homeBgmStarted = false;
+    const tryStartHomeBgm = () => {
+      if (homeBgmStarted || window.__zizaojiMuted) return;
+      homeBgmStarted = true;
+      narvBgm.play().catch(() => {});
+    };
+    ['pointerdown', 'touchstart', 'keydown'].forEach(evt =>
+      window.addEventListener(evt, tryStartHomeBgm, { passive: true })
+    );
+
+    // 阻止冒泡，避免点声音按钮时误触推进叙事步骤
+    narvSound.addEventListener('pointerdown', (e) => e.stopPropagation());
+    narvSound.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const nowMuted = narvSound.classList.toggle('muted');
+      // 声音开关同时控制整个应用的背景音乐与音效，并持久化到主程序
+      window.__zizaojiMuted = nowMuted;
+      try { localStorage.setItem('zizaoji_music_muted', nowMuted ? '1' : '0'); } catch (e2) {}
+      if (nowMuted) narvBgm.pause();
+      else { homeBgmStarted = true; narvBgm.play().catch(() => {}); }
+    });
+  }
+
+  // ===== 6-step narrative skip button (右上角跳过) =====
+  const narvSkip = document.getElementById('narvSkip');
+  if (narvSkip) {
+    // 阻止冒泡，避免点跳过时误触推进叙事步骤
+    narvSkip.addEventListener('pointerdown', (e) => e.stopPropagation());
+    narvSkip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (skipRequested) return;
+      skipRequested = true;
+      revealGallery();
+    });
+  }
+
+  let narrativeRunning = false;
+  async function playNarrative() {
+    if (narrativeRunning) return;
+    narrativeRunning = true;
+    preloadBanshu(); // 提前拉弘磊板书，保证第 06 步的「字」已是板书体
+    resizeNarrative();
+    buildStrobe();
+    narrative.classList.add('show');
+    if (narvSkip) narvSkip.classList.add('show');
+    startMotes();
+
+    // ---- 00 夜：夜色自黑中浮现（窗缓升；无星无月，纯黑静默；文字仅极淡一字）----
+    startNight();
+    narvWindow.classList.add('on');
+    showSub('夜');
+    await wait(2600);
+    hideSub();
+
+    // ---- 01 灯：灯芯点燃，暖光池在桌面晕开（光本身即叙事，不靠文字）----
+    narvLamp.classList.add('on');
+    narvStrobe.classList.add('on');
+    showSub('灯');
+    await wait(1100);
+    narvDesk.classList.add('on');
+    await wait(2000);
+    hideSub();
+
+    // ---- 02 手机：灯下点亮手机，虚拟打字——反复输入又删掉，犹豫迷茫不知道用什么字 ----
+    narvPhone.classList.add('on');
+    await wait(950);
+    narvCursor.classList.add('on');
+    await wait(700);
+    startPhoneTyping(); // 打字机循环：输入→删掉→换词，直到用户轻触
+    narvHint2.textContent = '轻触屏幕';
+    narvHint2.classList.add('show');
+    const touch = await waitFirstTouch();
+    stopPhoneTyping();
+    ripple(touch.x, touch.y);
+    narvHint2.classList.remove('show');
+    await wait(700);
+    narvCursor.classList.remove('on');
+    narvPhone.classList.remove('on');
+
+    // ---- 03 感觉：暖色光团浮起 → 「有些情绪，曾经没有名字。」→ 想凝成字，却「没有任何一个字能够准确表达」，随墨散（写不出）----
+    narvFeeling.classList.add('on');
+    await wait(1400);
+    await setText('有些情绪，曾经没有名字。', { serif: true, gold: true });
+    await wait(1500);
+    clearText();
+    await wait(400);
+    narvFeeling.classList.add('condense'); // 光团收紧，似要凝成那个「字」
+    await wait(1100);
+    await setText('没有任何一个字能够准确表达。');
+    dissolveWords(); // 文字如墨被水冲散
+    await wait(2000);
+    clearText();
+    narvFeeling.classList.remove('on', 'condense');
+    narvLamp.classList.remove('on');
+    narvStrobe.classList.remove('on');
+    await wait(800);
+
+    // ---- 04 无名之绪：黑暗里一个「名」反复想成形却碎散，甲骨文碎片欲聚又散（动效即「曾经没有名字」的余韵）----
+    narvVignette.classList.add('on');
+    spawnFragments();
+    // 「名」第一次尝试成形 → 将成未成地颤抖 → 碎散（4.4s）
+    playGhostName(1);
+    await wait(2600);
+    // 第二次尝试，仍未成；碎片随暗角呼吸始终无法凝为一个字
+    playGhostName(1);
+    await wait(1600);
+    clearGhost();
+    await wait(600);
+    clearFragments();
+    narvVignette.classList.remove('on');
+
+    // ---- 05 古人造字：拂去黑暗，露出甲骨文（交互，行动即叙事）----
+    await banshuReady(2500); // 确保汇聚成「字」时弘磊板书已就绪
+    startOracle();
+    narvHint2.textContent = '拖动指尖，拂去黑暗';
+    narvHint2.classList.add('show');
+    await enableWipe();
+    narvHint2.classList.remove('show');
+
+    // ---- 06 你的字：古字汇聚成「字」，再散开如邀请（一束光迸发，按钮亮起）----
+    flashBloom(); // 汇聚成「字」的那一束光
+    await gatherWord();
+    narvEnter.classList.add('show');
+  }
+
+  // ===================================================================
+  //  CREATE-JOURNEY  (开始造字之旅)
+  // ===================================================================
+  const createJourney = document.getElementById('createJourney');
+  const cjSeed = document.getElementById('cjSeed');
+  const cjInput = document.getElementById('cjInput');
+  const cjCanvas = document.getElementById('cjCanvas');
+  const cjResult = document.getElementById('cjResult');
+  const cjClose = document.getElementById('cjClose');
+  const cjBack = document.getElementById('cjBack');
+  const cjCommit = document.getElementById('cjCommit');
+  const cjctx = cjCanvas.getContext('2d');
+
+  let cjSeedEmotion = '安心';
+  let cjStrokes = [];
+  let cjCurrent = null;
+  let cjTrail = [];
+  let cjPointer = { x: 0, y: 0 };
+  let cjIsDown = false;
+  let cjRunning = false;
+  let cjLastTx = 0, cjLastTy = 0;
+
+  function resizeCj() {
+    const r = cjCanvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cjCanvas.width = r.width * dpr;
+    cjCanvas.height = r.height * dpr;
+    cjctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function openCreate(item) {
+    cjSeedEmotion = item.title;
+    cjSeed.textContent = `为「${item.title}」造一个字`;
+    cjInput.value = '';
+    cjStrokes = [];
+    cjCurrent = null;
+    cjTrail = [];
+    cjResult.innerHTML = '';
+    createJourney.classList.add('show');
+    setTimeout(resizeCj, 60);
+    if (!cjRunning) { cjRunning = true; requestAnimationFrame(cjRender); }
+  }
+  function closeCreate() {
+    createJourney.classList.remove('show');
+    cjRunning = false;
+  }
+  cjClose.addEventListener('click', closeCreate);
+  cjBack.addEventListener('click', closeCreate);
+
+  function cjPos(e) {
+    const r = cjCanvas.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    return { x: cx, y: cy };
+  }
+  cjCanvas.addEventListener('pointerdown', (e) => {
+    cjIsDown = true;
+    const p = cjPos(e);
+    cjPointer = p;
+    cjCurrent = [p];
+    cjTrail.push({ x: p.x, y: p.y, age: 0, life: 22, r: 9 });
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!cjRunning || !cjIsDown) return;
+    const p = cjPos(e);
+    cjPointer = p;
+    if (cjCurrent) cjCurrent.push(p);
+    const dx = p.x - cjLastTx, dy = p.y - cjLastTy;
+    if (dx * dx + dy * dy > 4) {
+      cjTrail.push({ x: p.x, y: p.y, age: 0, life: 22, r: 9 });
+      cjLastTx = p.x; cjLastTy = p.y;
+    }
+  });
+  window.addEventListener('pointerup', () => {
+    if (!cjIsDown) return;
+    cjIsDown = false;
+    if (cjCurrent && cjCurrent.length > 4) cjStrokes.push(cjCurrent);
+    cjCurrent = null;
+  });
+
+  function cjRender() {
+    if (!cjRunning) return;
+    cjctx.clearRect(0, 0, cjCanvas.width, cjCanvas.height);
+    // glass disk
+    const px = cjPointer.x, py = cjPointer.y;
+    cjctx.save();
+    cjctx.globalCompositeOperation = 'screen';
+    const g = cjctx.createRadialGradient(px, py, 4, px, py, 30);
+    g.addColorStop(0, 'rgba(245,240,230,0.16)');
+    g.addColorStop(1, 'rgba(245,240,230,0)');
+    cjctx.fillStyle = g;
+    cjctx.beginPath(); cjctx.arc(px, py, 30, 0, Math.PI * 2); cjctx.fill();
+    cjctx.restore();
+    // trail
+    cjctx.save();
+    cjctx.lineCap = 'round'; cjctx.lineJoin = 'round';
+    for (let i = cjTrail.length - 1; i >= 0; i--) {
+      const p = cjTrail[i]; p.age++;
+      if (p.age >= p.life) { cjTrail.splice(i, 1); continue; }
+      const life = 1 - p.age / p.life;
+      cjctx.globalCompositeOperation = 'screen';
+      cjctx.fillStyle = `rgba(245,240,230,${0.18 * life})`;
+      cjctx.beginPath(); cjctx.arc(p.x, p.y, p.r * (0.4 + life), 0, Math.PI * 2); cjctx.fill();
+    }
+    cjctx.restore();
+    // ink
+    cjctx.save();
+    cjctx.lineCap = 'round'; cjctx.lineJoin = 'round';
+    cjctx.shadowBlur = 16; cjctx.shadowColor = 'rgba(201,168,86,0.5)';
+    const all = [...cjStrokes];
+    if (cjCurrent) all.push(cjCurrent);
+    for (const st of all) {
+      if (st.length < 2) continue;
+      cjctx.beginPath();
+      cjctx.moveTo(st[0].x, st[0].y);
+      for (let i = 1; i < st.length; i++) {
+        const p = st[i], prev = st[i - 1];
+        cjctx.quadraticCurveTo(prev.x, prev.y, (prev.x + p.x) / 2, (prev.y + p.y) / 2);
+      }
+      cjctx.lineTo(st[st.length - 1].x, st[st.length - 1].y);
+      cjctx.strokeStyle = 'rgba(245,240,230,0.9)';
+      cjctx.lineWidth = 2.6;
+      cjctx.stroke();
+    }
+    cjctx.restore();
+    requestAnimationFrame(cjRender);
+  }
+
+  cjCommit.addEventListener('click', () => {
+    const name = (cjInput.value || '').trim();
+    if (!name) {
+      cjInput.focus();
+      cjInput.style.borderColor = 'var(--seal-light)';
+      setTimeout(() => { cjInput.style.borderColor = ''; }, 1200);
+      return;
+    }
+    let sketch = '';
+    try {
+      if (cjStrokes.length > 0 && cjCanvas.width > 0) {
+        const url = cjCanvas.toDataURL('image/png');
+        if (url.length > 200) sketch = url;
+      }
+    } catch (err) { sketch = ''; }
+    const char = name.charAt(0);
+    cjResult.innerHTML = `
+      <div class="cj-seal">${sketch ? `<img src="${sketch}" alt="${char}">` : char}</div>
+      <div class="cj-seal-name">「${name}」</div>
+      <p class="cj-seal-note">此字，为「${cjSeedEmotion}」而生。</p>
+      <button class="cj-restart" id="cjRestart">再写一个</button>
+    `;
+    const restart = document.getElementById('cjRestart');
+    if (restart) restart.addEventListener('click', () => {
+      cjInput.value = ''; cjStrokes = []; cjCurrent = null; cjResult.innerHTML = '';
+      cjInput.focus();
+    });
+  });
+
+  // ===== BorderGlow 边框光晕（鼠标靠近边缘时沿边框发光） =====
+  function initBorderGlow(el, opts) {
+    if (!el) return;
+    opts = opts || {};
+    const edge = (opts.edgeSensitivity != null) ? opts.edgeSensitivity : 30;
+    el.style.setProperty('--gc', opts.glowColor || '40 80 80');
+    el.style.setProperty('--gi', (opts.glowIntensity != null) ? opts.glowIntensity : 1);
+    el.style.setProperty('--gr', ((opts.glowRadius != null) ? opts.glowRadius : 40) + 'px');
+    if (opts.borderRadius != null) el.style.borderRadius = opts.borderRadius + 'px';
+    el.classList.add('border-glow');
+    function update(e) {
+      const r = el.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const dEdge = Math.min(x, y, r.width - x, r.height - y);
+      el.style.setProperty('--mx', x + 'px');
+      el.style.setProperty('--my', y + 'px');
+      el.style.setProperty('--ang', (Math.atan2(y - r.height / 2, x - r.width / 2) * 180 / Math.PI) + 'deg');
+      const near = dEdge < edge ? 1 : 0;
+      el.style.setProperty('--near', near);
+      el.classList.toggle('active', near === 1);
+    }
+    el.addEventListener('mousemove', update);
+    el.addEventListener('mouseleave', () => { el.style.setProperty('--near', 0); el.classList.remove('active'); });
+    el.addEventListener('touchstart', (e) => {
+      const t = e.touches[0]; if (!t) return;
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', (t.clientX - r.left) + 'px');
+      el.style.setProperty('--my', (t.clientY - r.top) + 'px');
+      el.style.setProperty('--near', 1); el.classList.add('active');
+    }, { passive: true });
+    el.addEventListener('touchend', () => { el.style.setProperty('--near', 0); el.classList.remove('active'); });
+  }
+  initBorderGlow(cjBack, { edgeSensitivity: 30, glowColor: '40 80 80', glowRadius: 40, glowIntensity: 1.0, borderRadius: 28, colors: ['#c084fc', '#f472b6', '#38bdf8'] });
+  initBorderGlow(cjCommit, { edgeSensitivity: 30, glowColor: '40 80 80', glowRadius: 40, glowIntensity: 1.0, borderRadius: 28, colors: ['#c084fc', '#f472b6', '#38bdf8'] });
+
+  // ===================================================================
+  //  SCROLL MASK TRANSITION  (card → 字卡「开始造字」 → 下一个页面)
+  // ===================================================================
+  const scrollMask = document.getElementById('scrollMask');
+  const smChar = document.getElementById('smChar');
+  const NEXT_PAGE = 'index.html';
+  let scrollTransitioning = false;
+
+  function startScrollTransition(item) {
+    if (scrollTransitioning) return;
+    scrollTransitioning = true;
+    RainFX.stop();
+    // 跳转瞬间即切换背景音乐：喜悦类→立即播 xiyue（缓入，无延迟）；其余→古琴续播（不中断）
+    try {
+      const JOY = ['xiyue', 'anxin', 'qidai', 'zhenfen'];
+      const emo = (item && (item.file || '')) ? String(item.file).replace(/^.*\//, '').replace(/\.png$/i, '') : '';
+      window.__zizaojiPendingEmotion = emo; // 供 emotionBgmKey() 在 AppState 初始化前即时识别情绪
+      if (window.AudioEngine && !window.__zizaojiMuted) {
+        // 喜悦类：先停开场古琴，再切到 xiyue；其余情绪保留古琴续播
+        if (JOY.indexOf(emo) >= 0 && window.narvBgm) {
+          try { window.narvBgm.pause(); window.narvBgm.currentTime = 0; } catch (e) {}
+        }
+        try { AudioEngine.unlock(); } catch (e) {}
+        try { AudioEngine.pageBgm('lab'); } catch (e) {} // 立即按情绪切换：古琴续播 或 xiyue 起播
+      }
+    } catch (ebgm) {}
+    if (smChar) smChar.textContent = item ? item.title : '字';
+    scrollMask.classList.add('active');
+    void scrollMask.offsetWidth; // force reflow so the fade transition runs
+    scrollMask.classList.add('show');
+    // 先变黑：等遮罩完全覆盖画面后，再跳转到下一个页面
+    // 跳转前记录主页背景音乐(home-guqin)的播放进度，主程序加载后从同一位置续播，做到「不中断」。
+    // 注意：只要曲子已经播到一定进度（currentTime>0）就记录，不再要求「正在播放」——
+    // 否则在自动播放被拦截 / 用户中途静音后恢复等场景下 narvBgm 处于 paused 状态，
+    // 进度不会被保存，主程序就会从 0 重新开始（即用户听到的「断奏 / 中断」）。
+    try {
+      if (narvBgm && !isNaN(narvBgm.currentTime) && narvBgm.currentTime > 0) {
+        sessionStorage.setItem('zizaoji_bgm_pos', String(narvBgm.currentTime));
+      }
+    } catch (e2) {}
+    // 记录用户选择的情绪卡片（如 anxin.png），主程序据此随机切换后续所有页面背景
+    try { if (item && item.file) sessionStorage.setItem('zizaoji_emotion', item.file); } catch (e3) {}
+    setTimeout(() => { enterMainApp(item); }, 1150);
+  }
+
+  // ===================================================================
+  //  OPENING GATE  (river bg + glass-cursor writing 字)
+  // ===================================================================
+  const opening = document.getElementById('opening');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  const guide = document.getElementById('guide');
+  const hint = document.getElementById('hint');
+  const successRing = document.getElementById('successRing');
+  const successText = document.getElementById('successText');
+
+  let W = window.innerWidth;
+  let H = window.innerHeight;
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const trail = [];
+  const TRAIL_LIFE = 28;
+  const TRAIL_INTERVAL = 2;
+  let lastTrailX = 0, lastTrailY = 0;
+  let pointer = { x: W / 2, y: H / 2 };
+  let isDown = false;
+  const strokes = [];
+  let currentStroke = null;
+
+  // 字 — normalized template (0..1 within char box). Cursive-friendly merged path.
+  const templateMerged = [
+    { x: 0.50, y: 0.10 }, { x: 0.50, y: 0.17 },
+    { x: 0.22, y: 0.27 }, { x: 0.50, y: 0.27 }, { x: 0.74, y: 0.35 },
+    { x: 0.34, y: 0.47 }, { x: 0.66, y: 0.47 }, { x: 0.60, y: 0.61 },
+    { x: 0.50, y: 0.47 }, { x: 0.50, y: 0.75 }, { x: 0.58, y: 0.70 },
+    { x: 0.30, y: 0.79 }, { x: 0.72, y: 0.79 }
+  ];
+
+  function charBox() {
+    const size = Math.min(W, H) * 0.55;
+    return { cx: W / 2, cy: H / 2, size, x0: W / 2 - size / 2, y0: H / 2 - size / 2 };
+  }
+  function normToScreen(pt) {
+    const b = charBox();
+    return { x: b.x0 + pt.x * b.size, y: b.y0 + pt.y * b.size };
+  }
+  function screenToNorm(pt) {
+    const b = charBox();
+    return { x: (pt.x - b.x0) / b.size, y: (pt.y - b.y0) / b.size };
+  }
+
+  function onDown(e) {
+    if (opening.classList.contains('done')) return;
+    isDown = true;
+    const p = getPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    currentStroke = [{ x: p.x, y: p.y, t: performance.now() }];
+    addTrail(p.x, p.y, true);
+  }
+  function onMove(e) {
+    const p = getPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    if (isDown && currentStroke) currentStroke.push({ x: p.x, y: p.y, t: performance.now() });
+    addTrail(p.x, p.y, false);
+  }
+  function onUp() {
+    if (!isDown) return;
+    isDown = false;
+    if (currentStroke && currentStroke.length > 4) {
+      strokes.push(currentStroke);
+      evaluate();
+    }
+    currentStroke = null;
+  }
+  function getPos(e) {
+    if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  canvas.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove, { passive: false });
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+  canvas.addEventListener('touchstart', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    strokes.length = 0;
+    currentStroke = null;
+    failCount = 0;
+    guide.classList.remove('glow');
+    hint.textContent = '以光标为笔，在虚空中书写「字」字，即可入字';
+    hint.style.color = 'rgba(245,240,230,0.5)';
+    enterBtn.classList.remove('show');
+  });
+
+  const enterBtn = document.getElementById('enterBtn');
+  enterBtn.addEventListener('click', () => {
+    if (!transitioned) { transitioned = true; dismissOpening(); }
+  });
+
+  function addTrail(x, y, force) {
+    if (!force) {
+      const dx = x - lastTrailX, dy = y - lastTrailY;
+      if (dx * dx + dy * dy < TRAIL_INTERVAL * TRAIL_INTERVAL) return;
+    }
+    lastTrailX = x; lastTrailY = y;
+    trail.push({ x, y, r: 10 + Math.random() * 4, age: 0, life: TRAIL_LIFE });
+  }
+
+  let failCount = 0;
+
+  function evaluate() {
+    if (strokes.length < 1) return;
+
+    let allPts = [];
+    let totalLen = 0;
+    for (const st of strokes) {
+      for (let i = 0; i < st.length; i++) {
+        allPts.push(st[i]);
+        if (i > 0) totalLen += Math.hypot(st[i].x - st[i - 1].x, st[i].y - st[i - 1].y);
+      }
+    }
+
+    const b = charBox();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of allPts) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    const w = maxX - minX, h = maxY - minY;
+    const aspect = w / Math.max(h, 1);
+    const ovX = Math.max(0, Math.min(maxX, b.x0 + b.size) - Math.max(minX, b.x0)) / Math.max(1, b.size);
+    const ovY = Math.max(0, Math.min(maxY, b.y0 + b.size) - Math.max(minY, b.y0)) / Math.max(1, b.size);
+    const coverage = ovX * ovY;
+
+    let topCount = 0, botCount = 0;
+    for (const p of allPts) {
+      const ny = (p.y - b.y0) / b.size;
+      if (ny < 0.42) topCount++;
+      else if (ny > 0.58) botCount++;
+    }
+    const n = allPts.length;
+    const topCover = topCount / n;
+    const botCover = botCount / n;
+
+    // Template similarity — merged path accepts both separated & cursive writing
+    const userMerged = resample(allPts, 64);
+    const tplMerged = resample(templateMerged.map(p => normToScreen(p)), 64);
+    const sim = strokeSimilarity(userMerged, tplMerged);
+
+    const lenOK = totalLen > b.size * 0.5;
+    const aspectOK = aspect > 0.32 && aspect < 2.4;
+    const regionOK = topCover > 0.06 && botCover > 0.06;
+    const covOK = coverage > 0.18;
+
+    const pass = sim > 0.5 && lenOK && aspectOK && regionOK && covOK && strokes.length >= 1;
+
+    if (pass) {
+      onSuccess();
+    } else {
+      failCount++;
+      guide.classList.remove('glow');
+      if (sim > 0.42) {
+        hint.textContent = '已近字形，再润一笔使之成「字」';
+      } else if (failCount >= 2) {
+        hint.innerHTML = '笔迹未成 · 可点右上「入境」直接进入';
+        enterBtn.classList.add('show');
+      } else {
+        hint.textContent = '笔迹未成，请依虚影再写一次「字」';
+      }
+      hint.style.color = 'rgba(200,160,120,0.85)';
+    }
+  }
+
+  function resample(pts, n) {
+    if (pts.length < 2) return pts;
+    const out = [pts[0]];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (total === 0) return pts;
+    const step = total / (n - 1);
+    let cur = 0;
+    let i = 1;
+    while (out.length < n && i < pts.length) {
+      const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      if (cur + d >= step) {
+        const t = (step - cur) / d;
+        out.push({ x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t });
+        pts.splice(i - 1, 1);
+        pts[i - 1] = out[out.length - 1];
+        cur = 0;
+      } else { cur += d; i++; }
+    }
+    while (out.length < n) out.push(pts[pts.length - 1]);
+    return out;
+  }
+
+  function strokeSimilarity(a, b) {
+    const na = normalizeStroke(a);
+    const nb = normalizeStroke(b);
+    let sum = 0;
+    for (let i = 0; i < na.length; i++) {
+      const dx = na[i].x - nb[i].x;
+      const dy = na[i].y - nb[i].y;
+      sum += Math.exp(-(dx * dx + dy * dy) * 4);
+    }
+    return sum / na.length;
+  }
+  function normalizeStroke(pts) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    const w = Math.max(maxX - minX, 0.001);
+    const h = Math.max(maxY - minY, 0.001);
+    const s = Math.max(w, h);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    return pts.map(p => ({ x: (p.x - cx) / s, y: (p.y - cy) / s }));
+  }
+
+  let transitioned = false;
+  function onSuccess() {
+    if (transitioned) return;
+    transitioned = true;
+    guide.classList.add('glow');
+    hint.textContent = '字已成，入境中…';
+    hint.style.color = 'var(--gold)';
+
+    canvas.removeEventListener('pointerdown', onDown);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+
+    successRing.classList.add('open');
+    successText.classList.add('show');
+
+    setTimeout(() => { dismissOpening(); }, 900);
+  }
+
+  // Reveal the 3D gallery in-place (no cross-file navigation)
+  function dismissOpening() {
+    opening.classList.add('done');
+    canvas.style.display = 'none';
+    setTimeout(() => { opening.style.display = 'none'; }, 1500);
+    playNarrative();
+  }
+
+  // ---------- Render loop for glass cursor + ink ----------
+  let renderRunning = true;
+  function render() {
+    if (!renderRunning) return;
+    ctx.clearRect(0, 0, W, H);
+    drawGlassDisk(pointer.x, pointer.y);
+
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i];
+      p.age++;
+      if (p.age >= p.life) { trail.splice(i, 1); continue; }
+    }
+    drawTrail();
+    drawInk();
+    if (opening.classList.contains('done')) { renderRunning = false; return; }
+    requestAnimationFrame(render);
+  }
+
+  function drawGlassDisk(x, y) {
+    const r = 34;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const g = ctx.createRadialGradient(x, y, r * 0.25, x, y, r);
+    g.addColorStop(0, 'rgba(245,240,230,0.18)');
+    g.addColorStop(0.5, 'rgba(245,240,230,0.06)');
+    g.addColorStop(1, 'rgba(245,240,230,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = 'blur(6px)';
+    const g2 = ctx.createRadialGradient(x, y, 0, x, y, r * 0.7);
+    g2.addColorStop(0, 'rgba(245,240,230,0.10)');
+    g2.addColorStop(1, 'rgba(245,240,230,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+
+  function drawTrail() {
+    if (trail.length < 2) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < trail.length - 1; i++) {
+      const a = trail[i], b = trail[i + 1];
+      const life = 1 - a.age / a.life;
+      const width = 2 + life * 10;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = `rgba(230, 220, 200, ${0.12 * life})`;
+      ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+      ctx.globalCompositeOperation = 'source-over';
+      const g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, width * 1.2);
+      g.addColorStop(0, `rgba(245,240,230,${0.22 * life})`);
+      g.addColorStop(1, 'rgba(245,240,230,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(a.x, a.y, width * 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawInk() {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = 'rgba(201, 168, 86, 0.55)';
+    const all = [...strokes];
+    if (currentStroke) all.push(currentStroke);
+    for (const stroke of all) {
+      if (stroke.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x, stroke[0].y);
+      for (let i = 1; i < stroke.length; i++) {
+        const p = stroke[i], prev = stroke[i - 1];
+        const mx = (prev.x + p.x) / 2, my = (prev.y + p.y) / 2;
+        ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
+      }
+      ctx.lineTo(stroke[stroke.length - 1].x, stroke[stroke.length - 1].y);
+      ctx.strokeStyle = 'rgba(245, 240, 230, 0.88)';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(201, 168, 86, 0.55)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ===================================================================
+  //  BOOT
+  // ===================================================================
+  initGallery();   // 构建 3D 漂浮画廊（情绪长廊）：有机浮动节点 + 拖拽惯性 + Z 轴聚焦
+  render();        // runs glass-cursor drawing loop for the opening
+  requestAnimationFrame(starLoop);
+  
+})();
+
+
+// ===================================================================
+//  开场 H5 (画廊 / 叙事 / 入场)  →  主程序 (六书实验室 / 工坊 / 海报)
+// ===================================================================
+function enterMainApp(item) {
+  try {
+    var emo = (item && (item.file || '')) ? String(item.file).replace(/^.*\//, '').replace(/\.png$/i, '') : '';
+    sessionStorage.setItem('zizaoji_emotion', emo);
+  } catch (e) {}
+  // 仅「喜悦类」情绪才停止开场古琴（因为主程序要切到 xiyue）；
+  // 其余情绪沿用古琴续播，避免跳转瞬间古琴断奏 / 重启。
+  try {
+    const JOY = ['xiyue', 'anxin', 'qidai', 'zhenfen'];
+    if (JOY.indexOf(emo) >= 0 && window.narvBgm) { window.narvBgm.pause(); window.narvBgm.currentTime = 0; }
+  } catch (e2) {}
+  document.body.classList.remove('h5-mode');
+  if (window.ZizaojiApp) { window.ZizaojiApp.start(); }
+}
+
+/* ===== [2] 主程序 ===== */
 /**
  * 字造集 - 主逻辑 main.js
  * 基于汉字构形美学与六书逻辑的汉字文化互动共创H5
@@ -44,16 +2177,15 @@
 
   // ===== 《字造集》配乐 / 音效系统 =====
   // 音乐开关状态持久化：开关同时控制背景音乐与交互音效（开场页与主页共用此状态）。
-  // 所有背景音乐均来自 assets/audio/bgm 目录。
+  // 所有背景音乐均来自 media/bgm 目录。
   window.__zizaojiMuted = localStorage.getItem('zizaoji_music_muted') === '1';
   // 音量统一按设计表的 dB 建议值换算为 HTMLAudio 的线性音量。
   const AudioEngine = (() => {
-    const base = 'assets/audio/';
+    const base = 'media/';
+    // 背景音乐只有两轨：古琴(home-guqin) 与 喜悦(xiyue)。
+    // 古琴不在此处登记——统一复用开场 H5 已创建的 window.narvBgm 单例（见 getAudio），
+    // AudioEngine 不再持有独立的 home-guqin 实例，避免「双古琴」叠加 / 重启。
     const tracks = {
-      bgmHome: 'bgm/home-guqin.mp3',
-      bgmCollection: 'bgm/home-guqin.mp3',
-      bgmMeaning: 'bgm/home-guqin.mp3',
-      bgmPoster: 'bgm/home-guqin.mp3',
       bgmJoy: 'bgm/xiyue.mp3',
       chime: 'sfx/select-chime.mp3',
       brush: 'sfx/brush-move.mp3',
@@ -86,7 +2218,8 @@
     // 选中以下情绪卡片时，背景音乐切换为 xiyue.mp3（喜悦曲风），其余情绪沿用 home-guqin
     const joyEmotions = ['xiyue', 'anxin', 'qidai', 'zhenfen'];
     function emotionBgmKey() {
-      const emo = (AppState.emotion || '').replace(/\.png$/i, '');
+      // 优先用主程序 AppState.emotion；跳转瞬间（AppState 尚未初始化）用 __zizaojiPendingEmotion 即时识别情绪
+      const emo = (AppState.emotion || window.__zizaojiPendingEmotion || '').replace(/\.png$/i, '');
       return joyEmotions.indexOf(emo) >= 0 ? 'bgmJoy' : 'bgmHome';
     }
     const audioCache = {};
@@ -100,6 +2233,17 @@
 
     function dbToVolume(db) { return Math.max(0, Math.min(1, Math.pow(10, db / 20))); }
     function getAudio(key) {
+      // 古琴类页面键（bgmHome / collection / meaning / poster）全部复用开场 window.narvBgm 单例，
+      // 不新建 AudioEngine 实例；真正独立的背景音乐只有 xiyue（bgmJoy）。
+      if (key === 'bgmHome' || key === 'bgmCollection' || key === 'bgmMeaning' || key === 'bgmPoster') {
+        if (!window.narvBgm) {
+          const a = new Audio(base + 'bgm/home-guqin.mp3');
+          a.loop = true; a.volume = 0.6; a.preload = 'auto';
+          try { a.load(); } catch(e) {}
+          window.narvBgm = a;
+        }
+        return window.narvBgm;
+      }
       if (!audioCache[key]) {
         const a = new Audio(base + tracks[key]);
         a.preload = 'auto';
@@ -258,8 +2402,8 @@
       if (!unlocked) { currentBgmKey = key; currentBgm = getAudio(key); currentBgm._zDb = db; return; }
       startBgm(key, db, false);
     }
-    // 预加载所有BGM文件，避免切换时因未加载导致play()失败
-    ['bgmHome','bgmCollection','bgmMeaning','bgmPoster','bgmJoy'].forEach(k => {
+    // 仅预载独立的 xiyue 音轨；古琴复用开场已加载的 window.narvBgm，无需重复预载
+    ['bgmJoy'].forEach(k => {
       try { const a = getAudio(k); a.preload = 'auto'; a.load(); } catch(e) {}
     });
     return { unlock, pageBgm, playSfx, fadeBgmOut, setMeaningStyle, getAudio, setMuted, toggleMuted, isMuted, ensureBgmRunning };
@@ -422,9 +2566,9 @@
   function getEmotionBg() {
     const emo = (AppState.emotion || '').replace(/\.png$/i, '');
     if (emo && EMOTION_BG_MAP[emo]) {
-      return 'assets/images/' + EMOTION_BG_MAP[emo];
+      return 'images/' + EMOTION_BG_MAP[emo];
     }
-    return 'assets/images/paper-bg.png'; // 兜底：未选情绪时用水墨宣纸
+    return 'images/paper-bg.png'; // 兜底：未选情绪时用水墨宣纸
   }
 
   // ====== 悲伤：贯穿全程的细雨（全局 canvas，内容之上、不挡交互）======
@@ -705,6 +2849,7 @@
           lab:['lab','每一种心情都等待一个名字。'],
           workshop:['workshop','你的此刻，会诞生怎样的文字呢？'],
           analysis:['analysis','让我把这个字的故事记下来。'],
+          meaning:['meaning','每一个字，都有它自己的故事。'],
           charcard:['charcard','我把它记下来了！'],
           collection:['collection','每一个字，都有属于自己的故事哦。']
           };
@@ -1051,7 +3196,7 @@
     // ===== 隐藏旁白：仅由入口触发，且只播放一次 =====
     function initVoice(){
       if(voiceAudio) return voiceAudio;
-      voiceAudio = new Audio('assets/voice.mp3');
+      voiceAudio = new Audio('media/voice.mp3');
       voiceAudio.loop = false;
       voiceAudio.volume = 0.85;
       voiceAudio.preload = 'auto';
@@ -1288,10 +3433,10 @@ AudioEngine.isMuted());
     if (!timeline || !sunImage) { console.error('象形关卡元素不存在'); return; }
 
     const stages = [
-      { img: 'assets/images/sun-real.svg' },
-      { img: 'assets/images/sun-oracle.svg' },
-      { img: 'assets/images/sun-seal.svg' },
-      { img: 'assets/images/sun-day.svg' }
+      { img: 'images/sun-real.svg' },
+      { img: 'images/sun-oracle.svg' },
+      { img: 'images/sun-seal.svg' },
+      { img: 'images/sun-day.svg' }
     ];
 
     timeline.value = 0;
@@ -2670,7 +4815,7 @@ if (index >= 3) {
   }
 
   // ===== P09 海报页 =====
-  // 海报相关脚本（poster.generator.js / poster.embedded-images.js）在页面加载时不再同步引入，
+  // 海报相关脚本（poster.generator.js，已内联合成背景图）在页面加载时不再同步引入，
   // 避免 6.8MB 内嵌图片阻塞首屏。这里按需/后台懒加载，进入海报页前确保已就绪。
   let _posterScriptsPromise = null;
   function loadScriptOnce(src) {
@@ -2690,9 +4835,8 @@ if (index >= 3) {
   }
   function ensurePosterScripts() {
     if (!_posterScriptsPromise) {
-      // poster.generator.js 在模块定义时读取 ZZJ_EMBEDDED_IMAGES，须先加载内嵌图片再加载生成器
-      _posterScriptsPromise = loadScriptOnce('js/poster.embedded-images.js')
-        .then(() => loadScriptOnce('js/poster.generator.js'))
+      // poster.generator.js 已内联合成背景图（ZZJ_EMBEDDED_IMAGES），只需加载一个文件
+      _posterScriptsPromise = loadScriptOnce('js/poster.generator.js')
         .catch(err => { _posterScriptsPromise = null; throw err; });
     }
     return _posterScriptsPromise;
@@ -3154,27 +5298,12 @@ if (index >= 3) {
       if (lab) lab.style.display = 'flex';
     }
 
-    // 从首页跳转后让背景音乐立即续播：依赖同源 Media Engagement，若被浏览器自动播放策略拦截，
-    // 首次用户交互时由 ensureBgmRunning() 兜底恢复，避免跳转后陷入静音。
+    // 背景音乐切换已在开场跳转瞬间（startScrollTransition）完成：
+    // 喜悦类→立即播 xiyue（缓入）；其余→古琴(window.narvBgm) 续播不中断。
+    // 此处再确认一次（兜底），保证主程序加载后音轨状态正确。
     if (!window.__zizaojiMuted) {
-      // 先取出续播点并消费掉，避免被 pageBgm 的「从头开始」逻辑（!unlocked 分支会 currentTime=0）清零
-      let resumePos = NaN;
-      try {
-        const p = parseFloat(sessionStorage.getItem('zizaoji_bgm_pos'));
-        if (!isNaN(p) && p > 0) { resumePos = p; sessionStorage.removeItem('zizaoji_bgm_pos'); }
-      } catch (e0) {}
-      try { AudioEngine.pageBgm('lab'); AudioEngine.unlock(); } catch(e) {}
-      // 关键：必须在 pageBgm / unlock 之后再把 home-guqin 定位到续播点，
-      // 否则 pageBgm 的 !unlocked 分支会把 currentTime 重置为 0，导致「从头播放 / 断奏」。
-      // 这样悲伤 / 孤独 / 愤怒 / 恐惧（沿用 home-guqin）点击情绪卡片后音乐无缝衔接。
-      if (!isNaN(resumePos) && resumePos > 0) {
-        try {
-          const a = AudioEngine.getAudio('bgmHome');
-          const applyPos = () => { try { a.currentTime = resumePos; } catch (e3) {} };
-          if (a.readyState >= 1) applyPos();
-          else a.addEventListener('loadedmetadata', applyPos, { once: true });
-        } catch (e2) {}
-      }
+      try { AudioEngine.unlock(); } catch (e) {}
+      try { AudioEngine.pageBgm('lab'); } catch (e) {}
     }
 
     // 应用可交互后即后台预载海报脚本（6.8MB 内嵌图片不阻塞首屏，且到海报页时通常已就绪）。
@@ -3182,10 +5311,22 @@ if (index >= 3) {
     setTimeout(() => { try { ensurePosterScripts(); } catch(e) {} }, 2000);
   }
 
-  // DOM加载完成后初始化
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  // 对外暴露主程序入口：由开场 H5（画廊 → 开始造字）调用，而非自动启动
+  window.ZizaojiApp = {
+    start: init,
+    navigateTo: navigateTo,
+    setEmotion: function (e) { AppState.emotion = e; },
+    getState: function () { return AppState; }
+  };
+
+  // 调试/直达入口：?app=1 跳过开场叙事，直接进入六书实验室
+  if (location.search.indexOf('app=1') >= 0) {
+    document.body.classList.remove('h5-mode');
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   }
 })();
+

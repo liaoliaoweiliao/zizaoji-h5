@@ -216,3 +216,94 @@
 .ink-transition.active {
   animation: inkSpread 1.2s ease-in-out forwards;
 }
+
+
+/* ===== 开场 H5 关键帧 ===== */
+
+@keyframes glyphFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.45; }
+      50% { transform: translateY(-14px) rotate(2deg); opacity: 0.9; }
+    }
+@keyframes lampBreathe {
+      0%, 100% { filter: brightness(1); box-shadow: 0 0 18px 8px rgba(255,182,104,0.5); }
+      50% { filter: brightness(1.14); box-shadow: 0 0 30px 13px rgba(255,190,120,0.66); }
+    }
+@keyframes lampSpread {
+      0% { opacity: 0; transform: translate(-50%, -32%) scale(0.2); }
+      100% { opacity: 1; transform: translate(-50%, -32%) scale(1); }
+    }
+@keyframes inkIn {
+      to { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
+    }
+@keyframes inkWash {
+      0%   { opacity: 1; filter: blur(0); transform: translate(0, 0) scale(1); }
+      42%  { opacity: 0.78; filter: blur(3px); }
+      100% { opacity: 0; filter: blur(17px); transform: translate(var(--dx, 0px), var(--dy, -30px)) scale(1.4); }
+    }
+@keyframes textTremble {
+      0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+      25% { transform: translate(-50%, -50%) translateX(-3px) rotate(-0.4deg); }
+      75% { transform: translate(-50%, -50%) translateX(3px) rotate(0.4deg); }
+    }
+@keyframes fragLife {
+      0%   { transform: rotate(0deg) translate(0, 0); opacity: 0.5; }
+      45%  { transform: rotate(150deg) translate(var(--tx, 0px), var(--ty, 0px)); opacity: 0.9; }
+      55%  { transform: rotate(210deg) translate(var(--tx, 0px), var(--ty, 0px)); opacity: 0.9; }
+      100% { transform: rotate(360deg) translate(0, 0); opacity: 0.5; }
+    }
+@keyframes rippleOut {
+      0% { transform: scale(0.4); opacity: 0.9; }
+      100% { transform: scale(7); opacity: 0; }
+    }
+@keyframes hintPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
+@keyframes moonBreath {
+      0%, 100% { box-shadow: 0 0 40px 12px rgba(240,235,215,0.12); }
+      50% { box-shadow: 0 0 60px 19px rgba(240,235,215,0.24); }
+    }
+@keyframes caretBlink { 0%, 100% { opacity: 0.85; } 50% { opacity: 0; } }
+@keyframes ghostFade {
+      0% { opacity: 0; filter: blur(6px); transform: translate(-50%, -50%) scale(1.08); }
+      35% { opacity: 0.7; filter: blur(0); }
+      100% { opacity: 0; filter: blur(7px); transform: translate(-50%, -54%) scale(0.96); }
+    }
+@keyframes feelingPulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
+      50% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
+    }
+@keyframes feelingCondense {
+      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.92; }
+      100% { transform: translate(-50%, -50%) scale(0.42); opacity: 0.18; }
+    }
+@keyframes vignettePulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.92; } }
+@keyframes ghostTry {
+      0%   { opacity: 0; filter: blur(12px); transform: translate(-50%,-50%) scale(0.74); }
+      26%  { opacity: 0.6; filter: blur(1.2px); transform: translate(-50%,-50%) scale(1.0); }   /* 几乎成形 */
+      40%  { opacity: 0.66; filter: blur(0.4px); transform: translate(-50.6%,-50.4%) scale(1.04) rotate(-1.4deg); } /* 颤抖：将成未成 */
+      54%  { opacity: 0.5; filter: blur(2.2px); transform: translate(-50%,-50%) scale(1.0) rotate(0.8deg); }
+      72%  { opacity: 0.18; filter: blur(5px); transform: translate(-50%,-50%) scale(0.96); }    /* 开始碎散 */
+      100% { opacity: 0; filter: blur(14px); transform: translate(-50%,-50%) scale(0.82); }       /* 散去：终究无名 */
+    }
+@keyframes bloomFlash {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      32% { opacity: 0.95; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); }
+    }
+@keyframes msUp { to { opacity: 1; transform: translateY(0); } }
+@keyframes obgDrift {
+      0%   { transform: scale(1.06) translate(-1.2%, -0.8%); }
+      50%  { transform: scale(1.10) translate(1.0%, 0.6%); }
+      100% { transform: scale(1.07) translate(0.6%, -1.1%); }
+    }
+@keyframes riverFlow {
+      0%   { background-position: 0 0; }
+      100% { background-position: 600px 240px; }
+    }
+@keyframes sealStamp {
+      0% { transform: scale(1.5) rotate(-8deg); opacity: 0; }
+      60% { transform: scale(0.94) rotate(2deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+@keyframes smLineIn { to { opacity: 0.7; } }
+@keyframes fadeDown { to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
