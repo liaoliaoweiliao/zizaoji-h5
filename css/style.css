@@ -4144,8 +4144,14 @@ body:not(.h5-mode) #h5-opening { display: none; }
       inset: 0;
       z-index: 4000;
       pointer-events: none;
+      background: rgba(6, 5, 10, 0.82);
+      opacity: 0;
+      transition: opacity 0.5s ease;
     }
-    .detail-overlay.active { pointer-events: auto; }
+    .detail-overlay.active {
+      pointer-events: auto;
+      opacity: 1;
+    }
 
     /* 悲伤情绪卡片：细雨滴下落动效（细、长、透明，整体极淡） */
     .rain-canvas {
@@ -4168,36 +4174,39 @@ body:not(.h5-mode) #h5-opening { display: none; }
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px 28px 60px;
+      padding: 48px 32px 56px;
       gap: 0;
-      transform: translateY(40px);
+      transform: translateY(30px) scale(0.97);
       opacity: 0;
-      transition: transform 0.75s cubic-bezier(0.22,1,0.36,1),
-                  opacity 0.6s ease;
+      transition: transform 0.7s cubic-bezier(0.22,1,0.36,1),
+                  opacity 0.5s ease;
     }
     .detail-overlay.active .detail-panel {
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
       opacity: 1;
     }
 
     .detail-content {
       width: 100%;
-      max-width: 520px;
+      max-width: 460px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 24px;
+      align-items: flex-start;
+      gap: 20px;
       position: relative;
     }
 
-    /* 居中情绪背景大图卡片 */
+    /* 居中情绪背景大图卡片 — hero element */
     .detail-image-card {
       position: relative;
       width: 100%;
-      max-width: 480px;
-      border-radius: 16px;
+      max-width: 460px;
+      border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 1px rgba(255,255,255,0.08) inset;
+      box-shadow:
+        0 25px 70px rgba(0,0,0,0.6),
+        0 0 0 1px rgba(255,255,255,0.06) inset,
+        0 0 60px rgba(201,168,86,0.06);
     }
     .detail-image-card img {
       width: 100%;
@@ -4212,80 +4221,91 @@ body:not(.h5-mode) #h5-opening { display: none; }
       position: absolute;
       left: 0;
       bottom: 0;
-      padding: 32px 28px 28px;
-      background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.45) 40%, rgba(0,0,0,0.72) 100%);
+      padding: 40px 30px 32px;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0,0,0,0.08) 30%,
+        rgba(0,0,0,0.45) 60%,
+        rgba(0,0,0,0.75) 100%
+      );
       width: 100%;
       box-sizing: border-box;
     }
 
     .detail-pinyin {
-      font-size: 0.85rem;
-      letter-spacing: 0.18em;
+      font-size: 0.82rem;
+      letter-spacing: 0.22em;
       color: var(--gold);
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      font-weight: 400;
+      opacity: 0.9;
     }
     .detail-title {
-      font-size: 2.4rem;
+      font-size: 2.6rem;
       font-weight: 700;
-      letter-spacing: 0.2em;
-      text-indent: 0.2em;
+      letter-spacing: 0.18em;
+      text-indent: 0.18em;
       color: #fff;
-      margin-bottom: 12px;
-      text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      margin-bottom: 14px;
+      text-shadow: 0 2px 16px rgba(0,0,0,0.55);
+      line-height: 1.15;
     }
     .detail-tag {
       display: inline-block;
-      padding: 5px 14px;
-      border: 1px solid var(--seal);
-      color: var(--seal-light);
+      padding: 5px 15px;
+      border: 1px solid rgba(201,168,86,0.45);
+      color: rgba(255,245,230,0.8);
       font-size: 0.72rem;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.14em;
       border-radius: 2px;
-      background: rgba(0,0,0,0.25);
+      background: rgba(0,0,0,0.2);
     }
 
     /* 描述文字在图下方 */
     .detail-desc {
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       line-height: 2;
-      color: var(--paper-200);
+      color: rgba(235,228,215,0.78);
       letter-spacing: 0.05em;
       text-align: left;
       width: 100%;
-      max-width: 480px;
+      max-width: 460px;
     }
 
     .create-btn {
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      padding: 13px 30px;
+      padding: 13px 28px;
       background: transparent;
-      border: 1px solid var(--gold);
-      color: var(--gold);
+      border: 1px solid rgba(201,168,86,0.5);
+      color: rgba(255,245,230,0.85);
       font-family: inherit;
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      text-indent: 0.18em;
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-indent: 0.16em;
       border-radius: 3px;
       cursor: pointer;
       position: relative;
       overflow: hidden;
-      transition: color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
+      transition: color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease, border-color 0.4s ease;
+      margin-top: 8px;
     }
     .create-btn::after {
       content: '';
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 50%, rgba(201,168,86,0.25), transparent 70%);
+      background: radial-gradient(circle at 50% 50%, rgba(201,168,86,0.2), transparent 70%);
       opacity: 0;
       transition: opacity 0.4s ease;
     }
     .create-btn:hover {
-      color: var(--paper-100);
-      background: rgba(184,155,74,0.12);
-      box-shadow: 0 0 30px rgba(184,155,74,0.35);
+      color: #fff;
+      background: rgba(201,168,86,0.1);
+      border-color: var(--gold);
+      box-shadow: 0 0 28px rgba(201,168,86,0.25);
     }
     .create-btn:hover::after { opacity: 1; }
     .create-btn .arrow { font-size: 1.1rem; }
